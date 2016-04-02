@@ -38,8 +38,8 @@ impl<'a> Scanner<'a> {
        static ref WHITESPACE: Regex = Regex::new(r"^\s*").unwrap();
     }
     match WHITESPACE.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => { self.advance_by(byte_index_end) }
-      None => { }
+      Some((_, byte_index_end)) => { self.advance_by(byte_index_end); }
+      None => {}
     };
   }
   

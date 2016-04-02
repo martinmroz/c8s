@@ -5,13 +5,14 @@ extern crate regex;
 pub mod assembler;
 
 use assembler::scanner::Scanner;
+use assembler::parser::*;
 
 use std::io::prelude::*;
 use std::fs::File;
 
 fn main() {
   
-  let path = "/Users/martinmroz/Desktop/c8s/src/test.S";
+  let path = "/Users/martinmroz/Development/c8s/src/test.S";
   
   // Open the file specified by path.
   let mut file = match File::open(path) {
@@ -29,8 +30,6 @@ fn main() {
   
   // Create a scanner to process the contents.
   let scanner = Scanner::new(buffer.as_str());
-  for token in scanner {
-    println!("{:?}", token);
-  }
+  parse(scanner);
   
 }
