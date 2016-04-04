@@ -17,6 +17,8 @@ pub enum Token<'a> {
   NumericLiteral(usize),
   /// List separator token ','.
   Comma,
+  /// Newline, a run of either \r or \n.
+  Newline,
   /// An including the reason that the tokenization failed.
   Error(String)
 }
@@ -35,12 +37,33 @@ impl<'a> Scanner<'a> {
    */
   fn consume_whitespace(&mut self) {
     lazy_static! {
-       static ref WHITESPACE: Regex = Regex::new(r"^\s*").unwrap();
+       static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n]+").unwrap();
     }
     match WHITESPACE.find(&self.input[self.position .. ]) {
       Some((_, byte_index_end)) => { self.advance_by(byte_index_end); }
       None => {}
     };
+  }
+
+  /**
+   Matches a run of newline characters.
+   */
+  fn consume_newline(&mut self) -> Token<'a> {
+    assert!(self.char_at(0) == '\r' || self.char_at(0) == '\n');
+    
+    // Determine how many bytes to consume in the run.
+    let mut bytes = 0;
+    for c in self.input[self.position .. ].chars() {
+      if c == '\r' || c == '\n' {
+        bytes = bytes + c.len_utf8();
+      } else { 
+        break;
+      }
+    }
+    
+    let slice = &self.input[self.position .. self.position + bytes];
+    self.advance_by(bytes);
+    Token::Newline
   }
   
   /**
@@ -256,11 +279,15 @@ impl<'a> Scanner<'a> {
       '_' | 'a' ... 'z' | 'A' ... 'Z' => {
         Some(self.consume_identifier()) 
       }
+
+      '\r' | '\n' => {
+        Some(self.consume_newline())
+      }
        
       c @ _  => { 
         // Advance to end of input on invalid token.
         self.position = self.input.len();
-        Some(Token::Error(format!("Invalid character {}", c)))
+        Some(Token::Error(format!("Invalid character '{}'", c)))
       }
     }
   }
@@ -339,6 +366,16 @@ mod tests {
   // MARK: - Non-Coding
   
   #[test]
+  fn test_newline() {
+    let mut scanner = Scanner::new("\r\n\r\n\n \n");
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.is_at_end(), true);
+  }
+
+  #[test]
   fn test_comment() {
     let mut scanner = Scanner::new(";");
     assert_eq!(scanner.is_at_end(), false);
@@ -349,14 +386,14 @@ mod tests {
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::SingleLineComment(";")));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), None);
+    assert_eq!(scanner.next(), Some(Token::Newline));
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new("; Single-Line Comment\n");
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment")));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), None);
+    assert_eq!(scanner.next(), Some(Token::Newline));
     assert_eq!(scanner.is_at_end(), true);
   }
   
@@ -378,7 +415,7 @@ mod tests {
     
     scanner = Scanner::new("_&");
     assert_eq!(scanner.next(), Some(Token::Identifier("_")));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid character &".to_string())));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string())));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
