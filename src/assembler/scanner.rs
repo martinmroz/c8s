@@ -61,7 +61,6 @@ impl<'a> Scanner<'a> {
       }
     }
     
-    let slice = &self.input[self.position .. self.position + bytes];
     self.advance_by(bytes);
     Token::Newline
   }
