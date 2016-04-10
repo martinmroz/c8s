@@ -30,6 +30,8 @@ fn main() {
   
   // Create a scanner to process the contents.
   let scanner = Scanner::new(buffer.as_str());
-  parse(scanner);
+  for node in parse(scanner).ok().unwrap() {
+    println!("{:?}", node);
+  }
   
 }

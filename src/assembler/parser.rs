@@ -22,8 +22,7 @@ use std::mem;
  */
 
 use assembler::scanner::Token;
-use assembler::instructions::{Literal, InstructionField};
-use assembler::instructions::{DirectiveNode, LabelNode, InstructionNode};
+use assembler::instructions::{Literal, InstructionField, Node};
 
 struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   /// Iterator over input token stream.
@@ -160,7 +159,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(result_list)
   }
 
-  fn parse_directive(&mut self) -> Result<DirectiveNode, String> {
+  fn parse_directive(&mut self) -> Result<Node<'a>, String> {
     /*
      directive ::= "." <identifier> <literal_list>
      */
@@ -168,26 +167,20 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     let identifier = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
-    let node = DirectiveNode::new(identifier, parameters);
 
-    println!("{:?}", &node);
-
-    Ok(node)
+    Ok(Node::Directive { identifier: identifier, arguments: parameters})
   }
 
-  fn parse_label(&mut self) -> Result<LabelNode, String> {
+  fn parse_label(&mut self) -> Result<Node<'a>, String> {
     /*
      label ::= <identifier> ":"
      */
 
     let identifier = try!(self.parse_identifier());
-    let node = LabelNode::new(identifier);
 
     expect!(self, Some(Token::LabelMarker));
 
-    println!("{:?}", &node);
-
-    Ok(node)
+    Ok(Node::Label {identifier: identifier})
   }
 
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
@@ -213,7 +206,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // An identiier was matched, which is either a Register or a Label.
       Some(Token::Identifier(id)) => {
-        match id {
+        let identifier_field = match id {
 
           // Match special-purpose registers.
           "dt" => InstructionField::DelayTimer,
@@ -236,8 +229,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
             field
           }
-        }
+        };
 
+        // Consume the matched identifier token.
+        let _ = self.consume_token();
+        identifier_field
       }
 
       // No field discovered.
@@ -261,68 +257,71 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(result_list)
   }
 
-  fn parse_instruction(&mut self) -> Result<InstructionNode, String> {
+  fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
     /*
      instruction ::= <identifier> <field_list>
      */
     let mnemonic = try!(self.parse_identifier());
     let fields = try!(self.parse_field_list(Vec::new()));
-    let node = InstructionNode::new(mnemonic, fields);
 
-    println!("{:?}", &node);
-
-    Ok(node)
+    Ok(Node::Instruction { mnemonic: mnemonic, fields: fields })
   }
 
-  fn parse_statement(&mut self) -> Result<(),String> {
+  fn parse_statement(&mut self) -> Result<Node<'a>, String> {
     /*
-     statement ::= comment | directive | label | instruction
+     statement ::= directive | label | instruction
      */
-
-    // A single-line comment or newline is consumed in place.
-    match self.current_token {
-      Some(Token::SingleLineComment(_)) | Some(Token::Newline) => {
-        let _ = self.consume_token();
-        return Ok(());
-      }
-      _ => {}
-    }
 
     // A directive is identified by a directive marker.
     if let Some(Token::DirectiveMarker) = self.current_token {
-      try!(self.parse_directive());
-      return Ok(());
+      let directive_node = try!(self.parse_directive());
+      return Ok(directive_node);
     }
 
     // A label is identified by an id followed by a label marker.
     if let (&Some(Token::Identifier(_)), &Some(Token::LabelMarker)) = (&self.current_token, &self.next_token) {
-      try!(self.parse_label());
-      return Ok(());
+      let label_node = try!(self.parse_label());
+      return Ok(label_node);
     }
 
     // Any remaining identifiers should be treated as instructions.
     if let Some(Token::Identifier(_)) = self.current_token {
-      try!(self.parse_instruction());
-      return Ok(());
+      let instruction_node = try!(self.parse_instruction());
+      return Ok(instruction_node);
     }
 
     Err(format!("Failed to parse statement."))
   }
 
-  fn parse_statement_list(&mut self) -> Result<(),String> {
+  fn parse_statement_list(&mut self) -> Result<Vec<Node<'a>>, String> {
     /*
-     statement_list ::= statement statement_list.
-     statement_list ::= .
+     statement_list ::= statement statement_list | .
      */
+    let mut node_list = Vec::new();
+
     while let Some(_) = self.current_token {
-      try!(self.parse_statement());
+      match self.current_token {
+
+        // A single-line comment or newline is consumed in place.
+        Some(Token::SingleLineComment(_)) | Some(Token::Newline) => {
+          let _ = self.consume_token();
+        }
+
+        // Append the new node to the ASL.
+        _ => {
+          let node = try!(self.parse_statement());
+          node_list.push(node);
+        }
+
+      }
     }
-    Ok(())
+
+    Ok(node_list)
   }
 
   // MARK: - Public Methods
 
-  fn parse(&mut self) -> Result<(),String> {
+  fn parse(&mut self) -> Result<Vec<Node<'a>>, String> {
     self.parse_statement_list()
   }
 
@@ -330,9 +329,9 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
 // MARK: - Parse Function
 
-pub fn parse<'a, I>(scanner: I) where I: Iterator<Item=Token<'a>> {
+pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterator<Item=Token<'a>> {
   let mut parser = Parser::new(scanner);
-  println!("{:?}", parser.parse());
+  parser.parse()
 }
 
 // MARK: - Tests
@@ -343,8 +342,7 @@ mod tests {
   use super::Parser;
 
   use assembler::scanner::Scanner;
-  use assembler::instructions::Literal;
-  use assembler::instructions::{LabelNode, DirectiveNode};
+  use assembler::instructions::{Literal, Node};
 
   #[test]
   fn test_parse_literal_list() {
@@ -387,17 +385,17 @@ mod tests {
   fn test_parse_directive() {
     // Test an origin directive.
     let mut org_parser = Parser::new(Scanner::new(".org $100\n"));
-    let expected_org = DirectiveNode::new("org", vec![Literal::Numeric(0x100)]);
+    let expected_org = Node::Directive { identifier: "org", arguments: vec![Literal::Numeric(0x100)] };
     assert_eq!(org_parser.parse_directive(), Ok(expected_org));
 
     // Test a db directive.
     let mut db_parser = Parser::new(Scanner::new(".db \"Hello, World!\", $0\n"));
-    let expected_db = DirectiveNode::new("db", vec![Literal::String("Hello, World!"), Literal::Numeric(0)]);
+    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)] };
     assert_eq!(db_parser.parse_directive(), Ok(expected_db));
 
     // Test a fictional argument-free directive.
     let mut test_parser = Parser::new(Scanner::new(".test\n"));
-    let expected_test = DirectiveNode::new("test", vec![]);
+    let expected_test = Node::Directive { identifier: "test", arguments: vec![] };
     assert_eq!(test_parser.parse_directive(), Ok(expected_test));
   }
 
@@ -405,7 +403,7 @@ mod tests {
   fn test_parse_label() {
     // Parse a label.
     let mut parser = Parser::new(Scanner::new("a:\n"));
-    let expected_label = LabelNode::new("a");
+    let expected_label = Node::Label { identifier: "a" }; 
     assert_eq!(parser.parse_label(), Ok(expected_label));
   }
 
