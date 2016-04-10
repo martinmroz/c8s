@@ -23,15 +23,20 @@ fn main() {
   let mut buffer = String::new();
   
   // Read the contents into the buffer.
-  match file.read_to_string(&mut buffer) {
-    Ok(_) => {}
-    Err(_) => { panic!("Unable to read contents of file {}", path); }
-  };
-  
+  file.read_to_string(&mut buffer)
+      .expect(format!("Unable to read contents of file {}", path).as_str());
+
   // Create a scanner to process the contents.
   let scanner = Scanner::new(buffer.as_str());
-  for node in parse(scanner).ok().unwrap() {
-    println!("{:?}", node);
+  match parse(scanner) {
+    Ok(asl) => {
+      for node in asl {
+        println!("{:?}", node);
+      }
+    }
+    Err(reason) => {
+      println!("Parse failed: {}", reason);
+    }
   }
   
 }

@@ -4,6 +4,6 @@ label:
   .db $00
   .db "Hello, World!"
 main:
-  ld v1, $2F
+  ld v1, $Q
   trap
   call $1FF
