@@ -41,3 +41,42 @@ impl<'a> LabelNode<'a> {
         }
     }
 }
+
+// MARK: - Syntax List Nodes - Instruction
+
+#[derive(Debug, PartialEq)]
+pub enum InstructionField<'a> {
+    /// A numeric literal value.
+    NumericLiteral(usize),
+    /// A general-purpose register beginning with "v".
+    GeneralPurposeRegister(u8),
+    /// The delay timer register ("dt").
+    DelayTimer,
+    /// The sound timer register ("st").
+    SoundTimer,
+    /// The keypad register ("k").
+    KeypadRegister,
+    /// The index register ("i").
+    IndexRegister,
+    /// Register-indirect access of memory ("[i]").
+    IndexRegisterIndirect,
+    /// Any other literal identifier, usually a label.
+    Identifier(&'a str)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InstructionNode<'a> {
+    /// The instruction mnemonic as parsed.
+    mnemonic: &'a str,
+    /// The fields associated with the instruction.
+    fields: Vec<InstructionField<'a>>
+}
+
+impl<'a> InstructionNode<'a> {
+    pub fn new(mnemonic: &'a str, fields: Vec<InstructionField<'a>>) -> InstructionNode<'a> {
+        InstructionNode {
+            mnemonic: mnemonic,
+            fields: fields
+        }
+    }
+}

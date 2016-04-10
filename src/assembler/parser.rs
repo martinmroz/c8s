@@ -22,8 +22,8 @@ use std::mem;
  */
 
 use assembler::scanner::Token;
-use assembler::instructions::Literal;
-use assembler::instructions::{DirectiveNode, LabelNode};
+use assembler::instructions::{Literal, InstructionField};
+use assembler::instructions::{DirectiveNode, LabelNode, InstructionNode};
 
 struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   /// Iterator over input token stream.
@@ -136,7 +136,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
     /*
      literal_list ::= <literal>
-     literal_list ::= <literal_list> "," <literal>
+     literal_list ::= <literal> "," <literal_list>
      literal_list ::= .
      */
 
@@ -190,11 +190,88 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(node)
   }
 
-  fn parse_instruction(&mut self) -> Result<(),String> {
+  fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
     /*
-     instruction ::= <identifier> instruction_args_for(instruction)
+     field_list ::= <field>
+     field_list ::= <field> "," <field_list>
+     field_list ::= .
      */
-    Ok(())
+    
+    let field = match self.current_token {
+
+      // The field list is complete.
+      Some(Token::Newline) => {
+        return Ok(list);
+      }
+
+      // A numeric literal parameter was matched.
+      Some(Token::NumericLiteral(number)) => {
+        let literal = InstructionField::NumericLiteral(number);
+        let _ = self.consume_token();
+        literal
+      }
+
+      // An identiier was matched, which is either a Register or a Label.
+      Some(Token::Identifier(id)) => {
+        match id {
+
+          // Match special-purpose registers.
+          "dt" => InstructionField::DelayTimer,
+          "st" => InstructionField::SoundTimer,
+           "i" => InstructionField::IndexRegister,
+           "k" => InstructionField::KeypadRegister,
+
+          // Now it's a GPR or an Identifier.
+          identifier_string @ _ => {
+            let mut field = InstructionField::Identifier(identifier_string);
+
+            // If the identifier matches ("v"[0-9a-fA-F]), it's a GPR.
+            let id_length = identifier_string.chars().count();
+            if (id_length == 2) && identifier_string.chars().next().unwrap() == 'v' {
+              let numeric_portion = &identifier_string['v'.len_utf8() .. ];
+              if let Some(value) = u8::from_str_radix(numeric_portion, 16).ok() {
+                field = InstructionField::GeneralPurposeRegister(value);
+              }
+            }
+
+            field
+          }
+        }
+
+      }
+
+      // No field discovered.
+      _ => {
+        return Err(self.syntax_error_for_unexpected_token("Instruction Field"))
+      }
+
+    };
+
+    // Append the parsed field to the list.
+    let mut result_list = list;
+    result_list.push(field);
+
+    // A comma following the field causes the rule to recurse.
+    if let Some(Token::Comma) = self.current_token {
+      let _ = self.consume_token();
+      result_list = try!(self.parse_field_list(result_list));
+    }
+    
+    // Return the complete list.
+    Ok(result_list)
+  }
+
+  fn parse_instruction(&mut self) -> Result<InstructionNode, String> {
+    /*
+     instruction ::= <identifier> <field_list>
+     */
+    let mnemonic = try!(self.parse_identifier());
+    let fields = try!(self.parse_field_list(Vec::new()));
+    let node = InstructionNode::new(mnemonic, fields);
+
+    println!("{:?}", &node);
+
+    Ok(node)
   }
 
   fn parse_statement(&mut self) -> Result<(),String> {
@@ -202,10 +279,13 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      statement ::= comment | directive | label | instruction
      */
 
-    // A single-line comment is consumed in place.
-    if let Some(Token::SingleLineComment(_)) = self.current_token {
-      let _ = self.consume_token();
-      return Ok(());
+    // A single-line comment or newline is consumed in place.
+    match self.current_token {
+      Some(Token::SingleLineComment(_)) | Some(Token::Newline) => {
+        let _ = self.consume_token();
+        return Ok(());
+      }
+      _ => {}
     }
 
     // A directive is identified by a directive marker.
@@ -222,7 +302,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     // Any remaining identifiers should be treated as instructions.
     if let Some(Token::Identifier(_)) = self.current_token {
-      return self.parse_instruction();
+      try!(self.parse_instruction());
+      return Ok(());
     }
 
     Err(format!("Failed to parse statement."))
