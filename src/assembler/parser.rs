@@ -75,8 +75,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   /**
    @return A string describing the situation where the parse rule was expecting
-   a certain token, and either a different one was found or the end of the
-   token stream was reached prematurely.
+     a certain token, and either a different one was found or the end of the
+     token stream was reached prematurely.
    */
   fn syntax_error_for_unexpected_token(&self, expecting: &'static str) -> String {
     if let Some(ref token) = self.current_token {
@@ -88,6 +88,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   // MARK: - Parser Rules
 
+  /**
+   Parses and consumes an IDENTIFIER token.
+   identifier ::= IDENTIFIER.
+   @return The string value of the identifier if successful, or an error.
+   */
   fn parse_identifier(&mut self) -> Result<&'a str, String> {
     if let Token::Identifier(identifier) = expect_and_consume!(self, Some(Token::Identifier(_))) {
       Ok(identifier)
@@ -96,33 +101,38 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     }
   }
 
+  /**
+   Parses and consumes a string or numeric literal.
+   literal ::= STRING | NUMERIC.
+   @return The literal if successful, or an error.
+   */
   fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
-    /*
-     literal ::= STRING | NUMERIC
-     */
+    match self.current_token {
 
-    // String literal.
-    if let Some(Token::StringLiteral(string)) = self.current_token {
-      let literal = Literal::String(string);
-      let _ = self.consume_token();
-      return Ok(literal);
+      // Match and consume a string literal token.
+      Some(Token::StringLiteral(string)) => {
+        let _ = self.consume_token();
+        Ok(Literal::String(string))
+      }
+
+      // Match and consume a numeric literal token.
+      Some(Token::NumericLiteral(number)) => {
+        let _ = self.consume_token();
+        Ok(Literal::Numeric(number))
+      }
+
+      _ => {
+        Err(self.syntax_error_for_unexpected_token("Numeric or String Literal"))
+      }
     }
-
-    // Numeric literal.
-    if let Some(Token::NumericLiteral(number)) = self.current_token {
-      let literal = Literal::Numeric(number);
-      let _ = self.consume_token();
-      return Ok(literal);
-    }
-
-    Err(self.syntax_error_for_unexpected_token("Numeric or String Literal"))
   }
 
+  /**
+   Parses and consumes a comma-separated list of zero-or-more string or numeric literals.
+   literal_list ::= literal | literal "," literal_list | .
+   @return A list of literals if successful, or an error.
+   */
   fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
-    /*
-     literal_list ::= literal | literal "," literal_list | .
-     */
-
     // The literal list is complete.
     if let Some(Token::Newline) = self.current_token {
       return Ok(list);
@@ -143,10 +153,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(result_list)
   }
 
+  /**
+   Parses and consumes an assembler directive and the associated literal parameters.
+   directive ::= "." IDENTIFIER literal_list
+   @return A directive node if successful, or an error.
+   */
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
-    /*
-     directive ::= "." identifier literal_list
-     */
     expect_and_consume!(self, Some(Token::DirectiveMarker));
 
     let identifier = try!(self.parse_identifier());
@@ -155,11 +167,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(Node::Directive { identifier: identifier, arguments: parameters})
   }
 
+  /**
+   Parses and consumes a label.
+   label ::= IDENTIFIER ":"
+   @return A Label node if successful, or an error.
+   */
   fn parse_label(&mut self) -> Result<Node<'a>, String> {
-    /*
-     label ::= IDENTIFIER ":"
-     */
-
     let identifier = try!(self.parse_identifier());
 
     expect_and_consume!(self, Some(Token::LabelMarker));
@@ -167,12 +180,15 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(Node::Label {identifier: identifier})
   }
 
+  /**
+   Parses and consumes a list of zero-or-more instruction fields. These fields can be numeric literals,
+   delay timer, sound timer, index register (direct or indirect), keypad register or a label.
+   field_list ::= field | field "," field_list | .
+   field ::= NUMERIC | IDENTIFIER
+   @return A list of fields if successful, or an error.
+   */
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
-    /*
-     field_list ::= field | field "," field_list | .
-     field ::= NUMERIC | IDENTIFIER
-     */
-    
+
     // The field list is complete.
     if let Some(Token::Newline) = self.current_token {
       return Ok(list);
@@ -240,20 +256,24 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(result_list)
   }
 
+  /**
+   Parses and consumes an instruction and it's associated fields.
+   instruction ::= IDENTIFIER field_list
+   @return An Instruction node if successful, or an error.
+   */
   fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
-    /*
-     instruction ::= IDENTIFIER field_list
-     */
     let mnemonic = try!(self.parse_identifier());
     let fields = try!(self.parse_field_list(Vec::new()));
 
     Ok(Node::Instruction { mnemonic: mnemonic, fields: fields })
   }
 
+  /**
+   Parses and consumes one of the three types of statements (a directive, label or instruction).
+   statement ::= directive | label | instruction
+   @return An appropriate Node if successful, or an error.
+   */
   fn parse_statement(&mut self) -> Result<Node<'a>, String> {
-    /*
-     statement ::= directive | label | instruction
-     */
 
     // A directive is identified by a directive marker.
     if let Some(Token::DirectiveMarker) = self.current_token {
@@ -276,10 +296,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Err(format!("Failed to parse statement."))
   }
 
+  /**
+   Parses and consumes a statement list, and consumes comments and newlines as they arrive.
+   statement_list ::= (statement | COMMENT | NEWLINE) statement_list | .
+   @return A list of consumed nodes if successful, or an error.
+   */
   fn parse_statement_list(&mut self) -> Result<Vec<Node<'a>>, String> {
-    /*
-     statement_list ::= (statement | COMMENT | NEWLINE) statement_list | .
-     */
     let mut node_list = Vec::new();
 
     while let Some(_) = self.current_token {
@@ -302,19 +324,19 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     Ok(node_list)
   }
 
-  // MARK: - Public Methods
-
-  fn parse(&mut self) -> Result<Vec<Node<'a>>, String> {
-    self.parse_statement_list()
-  }
-
 }
 
 // MARK: - Parse Function
 
+/**
+ Converts the input token stream into an abstract syntax list representing the totality
+ of the assembly file. This result is then fed into semantic analysis and code generation.
+ @param scanner The input token stream.
+ @return A list of Nodes for further processing, or an error.
+ */
 pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterator<Item=Token<'a>> {
   let mut parser = Parser::new(scanner);
-  parser.parse()
+  parser.parse_statement_list()
 }
 
 // MARK: - Tests
