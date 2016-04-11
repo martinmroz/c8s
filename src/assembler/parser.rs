@@ -463,4 +463,26 @@ mod tests {
               InstructionField::NumericLiteral(255)]));
   }
 
+  #[test]
+  fn test_parse_instruction() {
+    // Test an instruction with no fields.
+    let mut parser = Parser::new(Scanner::new("nop\n"));
+    let mut expected_instruction = Node::Instruction { mnemonic: "nop", fields: vec![] };
+    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+
+    // Test an instruction with one address target.
+    parser = Parser::new(Scanner::new("jp $002\n"));
+    expected_instruction = Node::Instruction { mnemonic: "jp", fields: vec![ InstructionField::NumericLiteral(2) ]};
+    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+
+    // Test an instruction with a heterogenous field list.
+    parser = Parser::new(Scanner::new("drw v1, v2, $fe\n"));
+    expected_instruction = Node::Instruction { mnemonic: "drw", fields: vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::NumericLiteral(254)
+    ]};
+    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+  }
+
 }
