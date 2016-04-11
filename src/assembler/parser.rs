@@ -130,6 +130,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   /**
    Parses and consumes a comma-separated list of zero-or-more string or numeric literals.
    literal_list ::= literal | literal "," literal_list | .
+   @param list Provide an empty Vec<Literal<'a>>.
    @return A list of literals if successful, or an error.
    */
   fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
@@ -185,6 +186,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    delay timer, sound timer, index register (direct or indirect), keypad register or a label.
    field_list ::= field | field "," field_list | .
    field ::= NUMERIC | IDENTIFIER
+   @param list Provide an empty Vec<InstructionField<'a>>.
    @return A list of fields if successful, or an error.
    */
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
