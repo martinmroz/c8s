@@ -40,7 +40,7 @@ struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
  token is consumed and the scanner advanced.
  @return The consumed token.
  */
-macro_rules! expect {
+macro_rules! expect_and_consume {
   ($parser:expr, $pattern:pat) => {{
     match $parser.current_token {
       $pattern => {
@@ -107,10 +107,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   // MARK: - Parser Rules
 
   fn parse_identifier(&mut self) -> Result<&'a str, String> {
-    if let Token::Identifier(identifier) = expect!(self, Some(Token::Identifier(_))) {
+    if let Token::Identifier(identifier) = expect_and_consume!(self, Some(Token::Identifier(_))) {
       Ok(identifier)
     } else {
-      Err(format!("Internal parser error, failure of expect! macro."))
+      Err(format!("Internal parser error, failure of expect_and_consume! macro."))
     }
   }
 
@@ -163,7 +163,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     /*
      directive ::= "." <identifier> <literal_list>
      */
-    expect!(self, Some(Token::DirectiveMarker));
+    expect_and_consume!(self, Some(Token::DirectiveMarker));
 
     let identifier = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
@@ -178,7 +178,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     let identifier = try!(self.parse_identifier());
 
-    expect!(self, Some(Token::LabelMarker));
+    expect_and_consume!(self, Some(Token::LabelMarker));
 
     Ok(Node::Label {identifier: identifier})
   }
