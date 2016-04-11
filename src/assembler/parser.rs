@@ -1,28 +1,10 @@
 
 use std::mem;
 
-/**
- program ::= statement_list
-
- statement_list ::= 
-    statement statement_list
-    | .
-
- statement ::= 
-    directive
-    | label
-    | instruction
-    | comment
-
- directive ::= "." <identifier> (<string_literal> | <numeric_literal>)
-
- label ::= <identifier> ":"
-
- instruction ::= <identifier> instruction_args_for(instruction)
- */
-
 use assembler::scanner::Token;
 use assembler::instructions::{Literal, InstructionField, Node};
+
+// MARK: - Local Parser Context
 
 struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   /// Iterator over input token stream.
@@ -115,6 +97,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   }
 
   fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
+    /*
+     literal ::= STRING | NUMERIC
+     */
+
     // String literal.
     if let Some(Token::StringLiteral(string)) = self.current_token {
       let literal = Literal::String(string);
@@ -134,9 +120,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
     /*
-     literal_list ::= <literal>
-     literal_list ::= <literal> "," <literal_list>
-     literal_list ::= .
+     literal_list ::= literal | literal "," literal_list | .
      */
 
     // The literal list is complete.
@@ -161,7 +145,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
     /*
-     directive ::= "." <identifier> <literal_list>
+     directive ::= "." identifier literal_list
      */
     expect_and_consume!(self, Some(Token::DirectiveMarker));
 
@@ -173,7 +157,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_label(&mut self) -> Result<Node<'a>, String> {
     /*
-     label ::= <identifier> ":"
+     label ::= IDENTIFIER ":"
      */
 
     let identifier = try!(self.parse_identifier());
@@ -185,9 +169,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
     /*
-     field_list ::= <field>
-     field_list ::= <field> "," <field_list>
-     field_list ::= .
+     field_list ::= field | field "," field_list | .
+     field ::= NUMERIC | IDENTIFIER
      */
     
     // The field list is complete.
@@ -259,7 +242,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
     /*
-     instruction ::= <identifier> <field_list>
+     instruction ::= IDENTIFIER field_list
      */
     let mnemonic = try!(self.parse_identifier());
     let fields = try!(self.parse_field_list(Vec::new()));
@@ -295,7 +278,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   fn parse_statement_list(&mut self) -> Result<Vec<Node<'a>>, String> {
     /*
-     statement_list ::= statement statement_list | .
+     statement_list ::= (statement | COMMENT | NEWLINE) statement_list | .
      */
     let mut node_list = Vec::new();
 
