@@ -190,12 +190,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      field_list ::= .
      */
     
-    let field = match self.current_token {
+    // The field list is complete.
+    if let Some(Token::Newline) = self.current_token {
+      return Ok(list);
+    }
 
-      // The field list is complete.
-      Some(Token::Newline) => {
-        return Ok(list);
-      }
+    let field = match self.current_token {
 
       // A numeric literal parameter was matched.
       Some(Token::NumericLiteral(number)) => {
@@ -342,7 +342,7 @@ mod tests {
   use super::Parser;
 
   use assembler::scanner::Scanner;
-  use assembler::instructions::{Literal, Node};
+  use assembler::instructions::{Literal, Node, InstructionField};
 
   #[test]
   fn test_parse_literal_list() {
@@ -405,6 +405,62 @@ mod tests {
     let mut parser = Parser::new(Scanner::new("a:\n"));
     let expected_label = Node::Label { identifier: "a" }; 
     assert_eq!(parser.parse_label(), Ok(expected_label));
+  }
+
+  #[test]
+  fn test_parse_field_list() {
+    // A field list expects to be terminated by a newline.
+    let mut parser = Parser::new(Scanner::new(""));
+    assert_eq!(parser.parse_field_list(Vec::new()), 
+      Err("Unexpected end-of-file reached. Expecting Instruction Field.".to_string()));
+
+    // A field list cannot contain a comma alone.
+    parser = Parser::new(Scanner::new(",\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), 
+      Err("Unexpected token found (Comma), expecting Instruction Field.".to_string()));
+
+    // A field list cannot contain a string literal.
+    parser = Parser::new(Scanner::new("\"Hello\"\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), 
+      Err("Unexpected token found (StringLiteral(\"Hello\")), expecting Instruction Field.".to_string()));
+
+    // An empty field list is valid.
+    parser = Parser::new(Scanner::new("\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![]));
+
+    // A field list can contain a single item.
+    parser = Parser::new(Scanner::new("$00\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(0)]));
+    parser = Parser::new(Scanner::new("v1\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::GeneralPurposeRegister(1)]));
+    parser = Parser::new(Scanner::new("dt\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::DelayTimer]));
+    parser = Parser::new(Scanner::new("st\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::SoundTimer]));
+    parser = Parser::new(Scanner::new("k\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::KeypadRegister]));
+    parser = Parser::new(Scanner::new("i\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegister]));
+    parser = Parser::new(Scanner::new("LABEL\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Identifier("LABEL")]));
+    // TODO: Add a test for Index Register Indirect mode ([i]).
+
+    // A field list can end in a trailing comma.
+    parser = Parser::new(Scanner::new("$FF,\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(255)]));
+
+    // A field list can contain multiple items of the same type.
+    parser = Parser::new(Scanner::new("v0,vf\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), 
+      Ok(vec![InstructionField::GeneralPurposeRegister(0), 
+              InstructionField::GeneralPurposeRegister(15)]));
+
+    // A field list can contain multiple items of the different types.
+    parser = Parser::new(Scanner::new("v1,v2,$ff\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), 
+      Ok(vec![InstructionField::GeneralPurposeRegister(1),
+              InstructionField::GeneralPurposeRegister(2),
+              InstructionField::NumericLiteral(255)]));
   }
 
 }
