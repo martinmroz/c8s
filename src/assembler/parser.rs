@@ -452,15 +452,21 @@ mod tests {
     // A field list can contain multiple items of the same type.
     parser = Parser::new(Scanner::new("v0,vf\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Ok(vec![InstructionField::GeneralPurposeRegister(0), 
-              InstructionField::GeneralPurposeRegister(15)]));
+      Ok(vec![
+        InstructionField::GeneralPurposeRegister(0), 
+        InstructionField::GeneralPurposeRegister(15)
+      ])
+    );
 
     // A field list can contain multiple items of the different types.
     parser = Parser::new(Scanner::new("v1,v2,$ff\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Ok(vec![InstructionField::GeneralPurposeRegister(1),
-              InstructionField::GeneralPurposeRegister(2),
-              InstructionField::NumericLiteral(255)]));
+      Ok(vec![
+        InstructionField::GeneralPurposeRegister(1),
+        InstructionField::GeneralPurposeRegister(2),
+        InstructionField::NumericLiteral(255)
+      ])
+    );
   }
 
   #[test]
