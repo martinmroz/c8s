@@ -160,8 +160,8 @@ mod tests {
   
   use super::*;
   use super::{validate_directive_semantics, size_of_directive};
+  use super::define_and_filter_labels;
 
-  use assembler::scanner::Scanner;
   use assembler::parser::*;
 
   #[test]
@@ -223,6 +223,38 @@ mod tests {
   #[should_panic]
   fn test_size_of_directive_panics_for_invalid_directive() {
     size_of_directive("dw", &vec![]);
+  }
+
+  #[test]
+  fn test_define_and_filter_labels() {
+    let program = vec![
+      Node::Directive   { identifier: "org", arguments: vec![Literal::Numeric(0x100)] },
+      Node::Label       { identifier: "label1" },
+      Node::Directive   { identifier: "db",  arguments: vec![Literal::Numeric(0xFF)]  },
+      Node::Label       { identifier: "label2" },
+      Node::Instruction {   mnemonic: "trap",   fields: vec![] },
+      Node::Label       { identifier: "label3" }
+    ];
+
+    let result = define_and_filter_labels(program);
+
+    // Assert that semantic analysis passed.
+    if let Err(reason) = result {
+      assert!(false, "Unexpected failure in assembler pass 1: {}", reason);
+      return;
+    }
+
+    // Verify that the 
+    if let Ok((filtered_asl, label_map)) = result {
+      assert_eq!(label_map.len(), 3);
+      assert_eq!(label_map.get("label1").unwrap(), &0x100);
+      assert_eq!(label_map.get("label2").unwrap(), &0x101);
+      assert_eq!(label_map.get("label3").unwrap(), &0x103);
+      assert_eq!(filtered_asl.len(), 3);
+      assert_eq!(filtered_asl.get(0).unwrap(), &Node::Directive { identifier: "org", arguments: vec![Literal::Numeric(0x100)] });
+      assert_eq!(filtered_asl.get(1).unwrap(), &Node::Directive { identifier: "db",  arguments: vec![Literal::Numeric(0xFF)] });
+      assert_eq!(filtered_asl.get(2).unwrap(), &Node::Instruction { mnemonic: "trap", fields: vec![] });
+    }
   }
 
 }
