@@ -3,6 +3,12 @@ use std::collections::BTreeMap;
 
 use assembler::parser::{Literal, Node, InstructionField};
 
+// MARK: - Constants
+
+const BYTES_PER_INSTRUCTION: usize = 2;
+const DIRECTIVE_ORG: &'static str = "org";
+const DIRECTIVE_DB : &'static str = "db";
+
 // MARK: - Semantic Analysis
 
 /**
@@ -13,7 +19,7 @@ fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal
      The 'org' directive is used to set the current output origin address. The directive requires
      a single numeric literal in the range $000-$FFF.
      */
-    if identifier == "org" {
+    if identifier == DIRECTIVE_ORG {
         if arguments.len() != 1 {
             return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1", arguments.len()));
         }
@@ -33,7 +39,7 @@ fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal
      A list of 1 or more literals is required, either numeric or string. 
      A string literal is emitted without a null-terminator.
      */
-    if identifier == "db" {
+    if identifier == DIRECTIVE_DB {
         if arguments.len() == 0 {
             return Err(format!("Incorrect number of parameters ({}) for directive .db, expecting 1 or more.", arguments.len()));
         }
@@ -57,12 +63,12 @@ fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal
  */
 fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> usize {
     // The origin directive is not emitted.
-    if identifier == "org" {
+    if identifier == DIRECTIVE_ORG {
         return 0;
     }
 
     // The number of bytes emitted by .db is the sum of argument lengths.
-    if identifier == "db" {
+    if identifier == DIRECTIVE_DB {
         return arguments.iter().fold(0, |acc, argument| {
             match *argument {
                 Literal::Numeric(number) if number <= 0xFF => { acc + 1 }
@@ -104,7 +110,7 @@ fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
                 current_address = current_address + size_of_directive(identifier, arguments);
 
                 // The origin directive changes the current address.
-                if let ("org", &Literal::Numeric(address)) = (identifier, &arguments[0]) {
+                if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (identifier, &arguments[0]) {
                     current_address = address;
                 }
             }
@@ -119,8 +125,8 @@ fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
             }
 
             Node::Instruction { mnemonic: _, fields: _ } => {
-                // All Chip8 instructions are two bytes.
-                current_address = current_address + 2;
+                // All Chip8 instructions are the same length.
+                current_address = current_address + BYTES_PER_INSTRUCTION;
             }
         }
     }
@@ -153,7 +159,7 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<(), String> {
 mod tests {
   
   use super::*;
-  use super::validate_directive_semantics;
+  use super::{validate_directive_semantics, size_of_directive};
 
   use assembler::scanner::Scanner;
   use assembler::parser::*;
@@ -196,6 +202,21 @@ mod tests {
     assert_eq!(validate_directive_semantics("dw", &params), Err("Unrecognized directive .dw".to_string()));
     params = vec![Literal::Numeric(0x100)];
     assert_eq!(validate_directive_semantics("dw", &params), Err("Unrecognized directive .dw".to_string()));
+  }
+
+  #[test]
+  fn test_size_of_directive_for_org() {
+    assert_eq!(size_of_directive("org", &vec![]), 0);
+    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100)]), 0);
+    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100), Literal::String("TEST_STRING")]), 0);
+  }
+
+  #[test]
+  fn test_size_of_directive_for_db() {
+    assert_eq!(size_of_directive("db", &vec![]), 0);
+    assert_eq!(size_of_directive("db", &vec![Literal::Numeric(0xFF)]), 1);
+    assert_eq!(size_of_directive("db", &vec![Literal::String("TEST_STRING")]), 11);
+    assert_eq!(size_of_directive("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]), 12);
   }
 
 }
