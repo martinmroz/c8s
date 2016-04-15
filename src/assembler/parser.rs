@@ -256,7 +256,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
             // If the identifier matches ("v"[0-9a-fA-F]), it's a GPR.
             let id_length = identifier_string.chars().count();
-            if (id_length == 2) && identifier_string.chars().next().unwrap() == 'v' {
+            if (id_length == 2) && (identifier_string.chars().next().unwrap() == 'v') {
               let numeric_portion = &identifier_string['v'.len_utf8() .. ];
               if let Some(value) = u8::from_str_radix(numeric_portion, 16).ok() {
                 field = InstructionField::GeneralPurposeRegister(value);
@@ -525,11 +525,14 @@ mod tests {
 
     // Test an instruction with a heterogenous field list.
     parser = Parser::new(Scanner::new("drw v1, v2, $fe\n"));
-    expected_instruction = Node::Instruction { mnemonic: "drw", fields: vec![
-      InstructionField::GeneralPurposeRegister(1),
-      InstructionField::GeneralPurposeRegister(2),
-      InstructionField::NumericLiteral(254)
-    ]};
+    expected_instruction = Node::Instruction { 
+      mnemonic: "drw", 
+      fields: vec![
+        InstructionField::GeneralPurposeRegister(1),
+        InstructionField::GeneralPurposeRegister(2),
+        InstructionField::NumericLiteral(254)
+      ]
+    };
     assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
   }
 
