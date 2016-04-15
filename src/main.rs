@@ -11,7 +11,7 @@ use std::io::prelude::*;
 use std::fs::File;
 
 fn main() {
-  
+
   let path = "/Users/martinmroz/Development/c8s/src/test.S";
   
   // Open the file specified by path.

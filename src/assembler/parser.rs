@@ -7,7 +7,9 @@ use assembler::scanner::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'a> {
+    /// A literal string value.
     String(&'a str),
+    /// A literal numeric value.
     Numeric(usize)
 }
 

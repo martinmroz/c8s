@@ -1,7 +1,28 @@
 
+use std::mem;
 use std::collections::BTreeMap;
 
 use assembler::parser::{Literal, Node, InstructionField};
+
+// MARK: - Result Type
+
+#[derive(PartialEq)]
+pub struct DataRange {
+  /// The first address populated by the bytes in the range.
+  pub start_address: usize,
+  /// The bytes occupying the range.
+  pub data: Vec<u8>
+}
+
+impl DataRange {
+  fn new(start_address: usize) -> DataRange {
+    assert!(start_address <= 0xFFF);
+    DataRange {
+      start_address: start_address,
+      data: Vec::new()
+    }
+  }
+}
 
 // MARK: - Constants
 
@@ -15,73 +36,73 @@ const DIRECTIVE_DB : &'static str = "db";
  @return () in the event the arguments are valid for the directive, or a failure reason.
  */
 fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> Result<(), String> {
-    /*
-     The 'org' directive is used to set the current output origin address. The directive requires
-     a single numeric literal in the range $000-$FFF.
-     */
-    if identifier == DIRECTIVE_ORG {
-        if arguments.len() != 1 {
-            return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1.", arguments.len()));
-        }
-        
-        match arguments[0] {
-            Literal::Numeric(a) if a <= 4095 => {} 
-            _ => {
-                return Err(format!("Directive .org requires 1 numeric literal in the range $000-$FFF."));
-            }
-        }
-
-        return Ok(());
+  /*
+   The 'org' directive is used to set the current output origin address. The directive requires
+   a single numeric literal in the range $000-$FFF.
+   */
+  if identifier == DIRECTIVE_ORG {
+    if arguments.len() != 1 {
+      return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1.", arguments.len()));
+    }
+    
+    match arguments[0] {
+      Literal::Numeric(a) if a <= 4095 => {} 
+      _ => {
+          return Err(format!("Directive .org requires 1 numeric literal in the range $000-$FFF."));
+      }
     }
 
-    /*
-     The 'db' directive is used to emit a series of bytes at the current location. 
-     A list of 1 or more literals is required, either numeric or string. 
-     A string literal is emitted without a null-terminator.
-     */
-    if identifier == DIRECTIVE_DB {
-        if arguments.len() == 0 {
-            return Err(format!("Incorrect number of parameters ({}) for directive .db, expecting 1 or more.", arguments.len()));
-        }
+    return Ok(());
+  }
 
-        for argument in arguments {
-            if let &Literal::Numeric(value) = argument {
-                if value > 0xFF {
-                    return Err(format!("All numeric parameters to .db must be 1-byte literals (${:X} > $FF)", value));
-                }
-            }
-        }
-
-        return Ok(());
+  /*
+   The 'db' directive is used to emit a series of bytes at the current location. 
+   A list of 1 or more literals is required, either numeric or string. 
+   A string literal is emitted without a null-terminator.
+   */
+  if identifier == DIRECTIVE_DB {
+    if arguments.len() == 0 {
+      return Err(format!("Incorrect number of parameters ({}) for directive .db, expecting 1 or more.", arguments.len()));
     }
 
-    Err(format!("Unrecognized directive .{}", identifier))
+    for argument in arguments {
+      if let &Literal::Numeric(value) = argument {
+          if value > 0xFF {
+              return Err(format!("All numeric parameters to .db must be 1-byte literals (${:X} > $FF)", value));
+          }
+      }
+    }
+
+    return Ok(());
+  }
+
+  Err(format!("Unrecognized directive .{}", identifier))
 }
 
 /**
  @return The number of bytes the directive represents within the output stream.
  */
 fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> usize {
-    // The origin directive is not emitted.
-    if identifier == DIRECTIVE_ORG {
-        return 0;
-    }
+  // The origin directive is not emitted.
+  if identifier == DIRECTIVE_ORG {
+    return 0;
+  }
 
-    // The number of bytes emitted by .db is the sum of argument lengths.
-    if identifier == DIRECTIVE_DB {
-        return arguments.iter().fold(0, |acc, argument| {
-            match *argument {
-                Literal::Numeric(number) if number <= 0xFF => { acc + 1 }
-                Literal::String(string) => { acc + string.len() }
-                _ => { 
-                    panic!("Semantic analysis for directive .{} failed.", identifier); 
-                }
-            }
-        });
-    }
+  // The number of bytes emitted by .db is the sum of argument lengths.
+  if identifier == DIRECTIVE_DB {
+    return arguments.iter().fold(0, |acc, argument| {
+      match *argument {
+        Literal::Numeric(number) if number <= 0xFF => { acc + 1 }
+        Literal::String(string) => { acc + string.len() }
+        _ => { 
+          panic!("Semantic analysis for directive .{} failed.", identifier); 
+        }
+      }
+    });
+  }
 
-    // The first pass at semantic analysis should have caught an invalid directive.
-    panic!("Semantic analysis for directive .{} failed.", identifier);
+  // The first pass at semantic analysis should have caught an invalid directive.
+  panic!("Semantic analysis for directive .{} failed.", identifier);
 }
 
 // MARK: - Pass 1: Define Labels
@@ -96,58 +117,108 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
      the reason the first pass failed.
  */
 fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<'a>>, BTreeMap<&'a str, usize>), String> {
-    let mut label_address_map = BTreeMap::new();
-    let mut current_address = 0x000;
+  let mut label_address_map = BTreeMap::new();
+  let mut current_address = 0x000;
 
-    // Define all labels and process '.org' directives.
-    for node in syntax_list.iter() {
-        match *node {
-            Node::Directive { identifier, ref arguments } => {
-                // Validate the directive and that the arguments match the identifier.
-                try!(validate_directive_semantics(identifier, arguments));
+  // Define all labels and process '.org' directives.
+  for node in syntax_list.iter() {
+    match *node {
+      Node::Directive { identifier, ref arguments } => {
+        // Validate the directive and that the arguments match the identifier.
+        try!(validate_directive_semantics(identifier, arguments));
 
-                // Adjust address by directive size.
-                current_address = current_address + size_of_directive(identifier, arguments);
+        // Adjust address by directive size.
+        current_address = current_address + size_of_directive(identifier, arguments);
 
-                // The origin directive changes the current address.
-                if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (identifier, &arguments[0]) {
-                    current_address = address;
-                }
-            }
-
-            Node::Label { identifier } => {
-                // Map the label to the current address and remove from the ASL.
-                if label_address_map.contains_key(&identifier) {
-                    return Err(format!("Attempted re-definition of label {}.", identifier));
-                }
-
-                label_address_map.insert(identifier, current_address);
-            }
-
-            Node::Instruction { mnemonic: _, fields: _ } => {
-                // All Chip8 instructions are the same length.
-                current_address = current_address + BYTES_PER_INSTRUCTION;
-            }
+        // The origin directive changes the current address.
+        if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (identifier, &arguments[0]) {
+          current_address = address;
         }
+      }
+
+      Node::Label { identifier } => {
+        // Map the label to the current address and remove from the ASL.
+        if label_address_map.contains_key(&identifier) {
+          return Err(format!("Attempted re-definition of label {}.", identifier));
+        }
+
+        label_address_map.insert(identifier, current_address);
+      }
+
+      Node::Instruction { mnemonic: _, fields: _ } => {
+        // All Chip8 instructions are the same length.
+        current_address = current_address + BYTES_PER_INSTRUCTION;
+      }
     }
+  }
 
-    // Remove any label nodes from the ASL as they have now been resolved.
-    let filtered_asl = syntax_list.into_iter().filter(|node| {
-        match *node {
-            Node::Label { identifier: _ } => false,
-            Node::Directive { identifier: _, arguments: _ } => true,
-            Node::Instruction { mnemonic: _, fields: _ } => true
-        }
-    }).collect();
+  // Remove any label nodes from the ASL as they have now been resolved.
+  let filtered_asl = syntax_list.into_iter().filter(|node| {
+    match *node {
+      Node::Label { identifier: _ } => false,
+      Node::Directive { identifier: _, arguments: _ } => true,
+      Node::Instruction { mnemonic: _, fields: _ } => true
+    }
+  }).collect();
 
-    // Semantic analysis for directives and labels is complete.
-    Ok((filtered_asl, label_address_map))
+  // Semantic analysis for directives and labels is complete.
+  Ok((filtered_asl, label_address_map))
 }
 
 // MARK: - Pass 2: Emit Bytes
 
-fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, BTreeMap<&'a str, usize>) -> Result<(), String> {
-  Ok(())
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: BTreeMap<&'a str, usize>) -> Result<Vec<DataRange>, String> {
+  let mut data_ranges = Vec::new();
+  let mut current_range = DataRange::new(0x000);
+
+  for node in syntax_list {
+    match node {
+      Node::Directive { identifier, arguments } => {
+        match identifier {
+          DIRECTIVE_ORG => {
+            // Push the current data range into the list of ranges and start a new one at the 'org' point.
+            if let &Literal::Numeric(address) = arguments.get(0).unwrap() {
+              let new_range = DataRange::new(address);
+              let previous_range = mem::replace(&mut current_range, new_range);
+              data_ranges.push(previous_range);
+            } else {
+              panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", identifier);
+            }
+          }
+          
+          DIRECTIVE_DB  => {
+            // Emit all the literal arguments directly to the data range.
+            for literal in arguments {
+              match literal {
+                Literal::Numeric(numeric) => {
+                  assert!(numeric <= 0xFF);
+                  current_range.data.push(numeric as u8);
+                }
+                Literal::String(string) => {
+                  current_range.data.extend_from_slice(string.as_bytes());
+                }
+              }
+            }
+          }
+
+          _ => {
+            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", identifier);
+          }
+        }
+      }
+
+      Node::Instruction { mnemonic: _, fields: _ } => {
+      }
+
+      _ => {
+        panic!("Internal assembler error: Labels not filtered before call to emit_data_ranges().");
+      }
+    }
+  }
+
+  // Push the last range into the list.
+  data_ranges.push(current_range);
+  Ok(data_ranges)
 }
 
 // MARK: - Public API
@@ -155,9 +226,9 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, BTreeMap<&'a str, usize>) ->
 /**
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
-pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<(), String> {
+pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
     let _ = try!(define_and_filter_labels(syntax_list));
-    Ok(())
+    Ok(vec![])
 }
 
 // MARK: - Tests
