@@ -21,7 +21,7 @@ fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal
      */
     if identifier == DIRECTIVE_ORG {
         if arguments.len() != 1 {
-            return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1", arguments.len()));
+            return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1.", arguments.len()));
         }
         
         match arguments[0] {
@@ -144,6 +144,14 @@ fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
     Ok((filtered_asl, label_address_map))
 }
 
+// MARK: - Pass 2: Emit Bytes
+
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, BTreeMap<&'a str, usize>) -> Result<(), String> {
+  Ok(())
+}
+
+// MARK: - Public API
+
 /**
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
@@ -151,7 +159,6 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<(), String> {
     let _ = try!(define_and_filter_labels(syntax_list));
     Ok(())
 }
-
 
 // MARK: - Tests
 
@@ -164,12 +171,14 @@ mod tests {
 
   use assembler::parser::*;
 
+  // MARK: - Pass 1 Tests
+
   #[test]
   fn test_validate_directive_semantics_for_org() {
     let mut params = vec![];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (0) for directive .org, expecting 1".to_string()));
+    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
     params = vec![Literal::Numeric(1), Literal::Numeric(3)];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (2) for directive .org, expecting 1".to_string()));
+    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (2) for directive .org, expecting 1.".to_string()));
     params = vec![Literal::Numeric(0x1000)];
     assert_eq!(validate_directive_semantics("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
     params = vec![Literal::String("TEST_STRING")];
@@ -256,5 +265,40 @@ mod tests {
       assert_eq!(filtered_asl.get(2).unwrap(), &Node::Instruction { mnemonic: "trap", fields: vec![] });
     }
   }
+
+  #[test]
+  fn test_define_and_filter_labels_does_semantic_analysis_on_org() {
+    let program = vec![
+      Node::Directive { identifier: "org", arguments: vec![] },
+    ];
+
+    let result = define_and_filter_labels(program);
+    assert_eq!(result, Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
+  }
+
+  #[test]
+  fn test_define_and_filter_labels_does_semantic_analysis_on_db() {
+    let program = vec![
+      Node::Directive { identifier: "db", arguments: vec![] },
+    ];
+
+    let result = define_and_filter_labels(program);
+    assert_eq!(result, Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
+  }
+
+  #[test]
+  fn test_define_and_filter_labels_fails_on_redefinition() {
+    let program = vec![
+      Node::Label { identifier: "L1" },
+      Node::Label { identifier: "L1" }
+    ];
+
+    let result = define_and_filter_labels(program);
+    assert_eq!(result, Err("Attempted re-definition of label L1.".to_string()));
+  }
+
+  // MARK: - Pass 2 Tests
+
+
 
 }
