@@ -219,4 +219,10 @@ mod tests {
     assert_eq!(size_of_directive("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]), 12);
   }
 
+  #[test]
+  #[should_panic]
+  fn test_size_of_directive_panics_for_invalid_directive() {
+    size_of_directive("dw", &vec![]);
+  }
+
 }
