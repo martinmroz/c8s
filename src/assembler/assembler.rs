@@ -140,9 +140,9 @@ fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
         // Map the label to the current address and remove from the ASL.
         if label_address_map.contains_key(&identifier) {
           return Err(format!("Attempted re-definition of label {}.", identifier));
+        } else {
+          label_address_map.insert(identifier, current_address);
         }
-
-        label_address_map.insert(identifier, current_address);
       }
 
       Node::Instruction { mnemonic: _, fields: _ } => {
