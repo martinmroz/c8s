@@ -2,6 +2,8 @@
 use std::mem;
 use std::collections::BTreeMap;
 
+use assembler::u12::*;
+use assembler::opcode::Opcode;
 use assembler::parser::{Literal, Node, InstructionField};
 
 // MARK: - Result Type
@@ -105,6 +107,170 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
   panic!("Semantic analysis for directive .{} failed.", identifier);
 }
 
+/**
+ */
+fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<Vec<u8>, String> {
+  let mut opcode: Option<Opcode> = None;
+
+  // Instructions taking zero parameters.
+  if fields.len() == 0 {
+    opcode = match mnemonic {
+      "nop"     => Some(Opcode::NOP),
+      "cls"     => Some(Opcode::CLS),
+      "ret"     => Some(Opcode::RET),
+      "trap"    => Some(Opcode::TRAP),
+      "trapret" => Some(Opcode::TRAPRET),
+      _         => None
+    };
+  }
+
+  // Instructions taking one parameter.
+  if fields.len() == 1 {
+    opcode = match (mnemonic, fields.get(0).unwrap()) {
+      ("jp",   &InstructionField::NumericLiteral(target)) => Some(Opcode::JP   { target: target.as_u12().unwrap() }),
+      ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target.as_u12().unwrap() }),
+      _ => None
+    }
+  }
+
+  // Instructions taking two parameters.
+  if fields.len() == 2 {
+    opcode = match (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap()) {
+      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::SE_IMMEDIATE { register_x: x, value: value as u8 })
+      }
+
+      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::SNE_IMMEDIATE { register_x: x, value: value as u8 })
+      }
+
+      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SE_REGISTER { register_x: x, register_y: y })
+      }
+
+      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SNE_REGISTER { register_x: x, register_y: y })
+      }
+
+      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::LD_IMMEDIATE { register_x: x, value: value as u8 })
+      }
+
+      ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::ADD_IMMEDIATE { register_x: x, value: value as u8 })
+      }
+
+      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::LD_REGISTER { register_x: x, register_y: y })
+      }
+
+      ("or", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::OR { register_x: x, register_y: y })
+      }
+
+      ("and", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::AND { register_x: x, register_y: y })
+      }
+
+      ("xor", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::XOR { register_x: x, register_y: y })
+      }
+
+      ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::ADD_REGISTER { register_x: x, register_y: y })
+      }
+
+      ("sub", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SUB { register_x: x, register_y: y })
+      }
+
+      ("shr", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SHR { register_x: x, register_y: y })
+      }
+
+      ("subn", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SUBN { register_x: x, register_y: y })
+      }
+
+      ("shl", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
+        Some(Opcode::SHL { register_x: x, register_y: y })
+      }
+
+      ("ld", &InstructionField::IndexRegister, &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::LD_I { value: value.as_u12().unwrap() })
+      }
+
+      ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::JP_V0 { value: value.as_u12().unwrap() })
+      }
+
+      ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
+        Some(Opcode::RND { register_x: x, mask: value as u8 })
+      }
+
+      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
+        Some(Opcode::SE_K { register_x: x })
+      }
+
+      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
+        Some(Opcode::SNE_K { register_x: x })
+      }
+
+      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::DelayTimer) => {
+        Some(Opcode::LD_X_DT { register_x: x })
+      }
+
+      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
+        Some(Opcode::LD_X_K { register_x: x })
+      }
+
+      ("ld", &InstructionField::DelayTimer, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::LD_DT_X { register_x: x })
+      }
+
+      ("ld", &InstructionField::SoundTimer, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::LD_ST_X { register_x: x })
+      }
+
+      ("add", &InstructionField::IndexRegister, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::ADD_I_X { register_x: x })
+      }
+
+      ("sprite", &InstructionField::IndexRegister, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::SPRITE_I { register_x: x })
+      }
+
+      ("bcd", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::BCD_I { register_x: x })
+      }
+
+      ("save", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::SAVE_I { register_x: x })
+      }
+
+      ("restore", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        Some(Opcode::RESTORE_I { register_x: x })
+      }
+
+      _ => None
+    };
+  }
+
+  // Instructions taking three parameters.
+  if fields.len() == 3 {
+    let tuple = (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap(), fields.get(2).unwrap());
+    if let (
+      "drw", 
+      &InstructionField::GeneralPurposeRegister(x), 
+      &InstructionField::GeneralPurposeRegister(y),
+      &InstructionField::NumericLiteral(value)) = tuple {
+      opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: value as u8} );
+    }
+  }
+
+  Ok(vec![])
+}
+
 // MARK: - Pass 1: Define Labels
 
 /**
@@ -167,7 +333,7 @@ fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
 
 // MARK: - Pass 2: Emit Bytes
 
-fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: BTreeMap<&'a str, usize>) -> Result<Vec<DataRange>, String> {
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, usize>) -> Result<Vec<DataRange>, String> {
   let mut data_ranges = Vec::new();
   let mut current_range = DataRange::new(0x000);
 
@@ -207,7 +373,10 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: BTreeMap<
         }
       }
 
-      Node::Instruction { mnemonic: _, fields: _ } => {
+      Node::Instruction { mnemonic, fields } => {
+        // Verify the semantics and convert the instruction into a byte array.
+        let bytes = try!(assemble_instruction(mnemonic, fields, label_address_map));
+        current_range.data.extend(bytes);
       }
 
       _ => {
