@@ -112,7 +112,7 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
 fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<Vec<u8>, String> {
   let mut opcode: Option<Opcode> = None;
 
-  // Instructions taking zero parameters.
+  // Mnemonics with zero parameters.
   if fields.len() == 0 {
     opcode = match mnemonic {
       "nop"     => Some(Opcode::NOP),
@@ -124,16 +124,39 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
     };
   }
 
-  // Instructions taking one parameter.
+  // Mnemonics with one parameter.
   if fields.len() == 1 {
     opcode = match (mnemonic, fields.get(0).unwrap()) {
-      ("jp",   &InstructionField::NumericLiteral(target)) => Some(Opcode::JP   { target: target.as_u12().unwrap() }),
+
+      ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target.as_u12().unwrap() }),
+
+      // The 'jp' instruction may reference a label.
+      ("jp", &InstructionField::Identifier(label)) => {
+        match label_map.get(label) {
+          Some(value) => Some(Opcode::JP { target: value.as_u12().unwrap() }),
+          _ => {
+            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
+          }
+        }
+      }
+
       ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target.as_u12().unwrap() }),
+
+      // The 'call' instruction may reference a label.
+      ("call", &InstructionField::Identifier(label)) => {
+        match label_map.get(label) {
+          Some(value) => Some(Opcode::CALL { target: value.as_u12().unwrap() }),
+          _ => {
+            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
+          }
+        }
+      }
+
       _ => None
     }
   }
 
-  // Instructions taking two parameters.
+  // Mnemonics with two parameters.
   if fields.len() == 2 {
     opcode = match (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap()) {
       ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
@@ -200,8 +223,26 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
         Some(Opcode::LD_I { value: value.as_u12().unwrap() })
       }
 
+      ("ld", &InstructionField::IndexRegister, &InstructionField::Identifier(label)) => {
+        match label_map.get(label) {
+          Some(value) => Some(Opcode::LD_I { value: value.as_u12().unwrap() }),
+          _ => {
+            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
+          }
+        }
+      }
+
       ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::NumericLiteral(value)) => {
         Some(Opcode::JP_V0 { value: value.as_u12().unwrap() })
+      }
+
+      ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::Identifier(label)) => {
+        match label_map.get(label) {
+          Some(value) => Some(Opcode::JP_V0 { value: value.as_u12().unwrap() }),
+          _ => {
+            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
+          }
+        }
       }
 
       ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
@@ -256,7 +297,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
     };
   }
 
-  // Instructions taking three parameters.
+  // Mnemonics with three parameter.
   if fields.len() == 3 {
     let tuple = (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap(), fields.get(2).unwrap());
     if let (
@@ -268,7 +309,16 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
     }
   }
 
-  Ok(vec![])
+  // Assemble the matched instruction.
+  match opcode {
+    None => { Err(format!("Unable to assemble instruction {} {:?}", mnemonic, fields)) }
+    Some(value) => {
+      let instruction: u16 = value.as_instruction();
+      let hi_8 = ((instruction & 0xFF00) >> 8) as u8;
+      let lo_8 = ((instruction & 0x00FF) >> 0) as u8;
+      Ok(vec![hi_8, lo_8])
+    }
+  }
 }
 
 // MARK: - Pass 1: Define Labels
@@ -282,7 +332,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
      the map of labels to their corresponding addresses) on success or a string describing
      the reason the first pass failed.
  */
-fn define_and_filter_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<'a>>, BTreeMap<&'a str, usize>), String> {
+fn filter_and_define_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<'a>>, BTreeMap<&'a str, usize>), String> {
   let mut label_address_map = BTreeMap::new();
   let mut current_address = 0x000;
 
@@ -396,8 +446,8 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-    let _ = try!(define_and_filter_labels(syntax_list));
-    Ok(vec![])
+    let (filtered_syntax_list, label_address_map) = try!(filter_and_define_labels(syntax_list));
+    emit_data_ranges(filtered_syntax_list, &label_address_map)
 }
 
 // MARK: - Tests
@@ -407,7 +457,7 @@ mod tests {
   
   use super::*;
   use super::{validate_directive_semantics, size_of_directive};
-  use super::define_and_filter_labels;
+  use super::filter_and_define_labels;
 
   use assembler::parser::*;
 
@@ -475,7 +525,7 @@ mod tests {
   }
 
   #[test]
-  fn test_define_and_filter_labels() {
+  fn test_filter_and_define_labels() {
     let program = vec![
       Node::Directive   { identifier: "org", arguments: vec![Literal::Numeric(0x100)] },
       Node::Label       { identifier: "label1" },
@@ -485,7 +535,7 @@ mod tests {
       Node::Label       { identifier: "label3" }
     ];
 
-    let result = define_and_filter_labels(program);
+    let result = filter_and_define_labels(program);
 
     // Assert that semantic analysis passed.
     if let Err(reason) = result {
@@ -507,33 +557,33 @@ mod tests {
   }
 
   #[test]
-  fn test_define_and_filter_labels_does_semantic_analysis_on_org() {
+  fn test_filter_and_define_labels_does_semantic_analysis_on_org() {
     let program = vec![
       Node::Directive { identifier: "org", arguments: vec![] },
     ];
 
-    let result = define_and_filter_labels(program);
+    let result = filter_and_define_labels(program);
     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
   }
 
   #[test]
-  fn test_define_and_filter_labels_does_semantic_analysis_on_db() {
+  fn test_filter_and_define_labels_does_semantic_analysis_on_db() {
     let program = vec![
       Node::Directive { identifier: "db", arguments: vec![] },
     ];
 
-    let result = define_and_filter_labels(program);
+    let result = filter_and_define_labels(program);
     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
   }
 
   #[test]
-  fn test_define_and_filter_labels_fails_on_redefinition() {
+  fn test_filter_and_define_labels_fails_on_redefinition() {
     let program = vec![
       Node::Label { identifier: "L1" },
       Node::Label { identifier: "L1" }
     ];
 
-    let result = define_and_filter_labels(program);
+    let result = filter_and_define_labels(program);
     assert_eq!(result, Err("Attempted re-definition of label L1.".to_string()));
   }
 
