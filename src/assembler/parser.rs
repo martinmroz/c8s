@@ -197,7 +197,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return A directive node if successful, or an error.
    */
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
-    expect_and_consume!(self, Some(Token::DirectiveMarker));
+    expect_and_consume!(self, Some(Token::DirectiveMarker(_)));
 
     let identifier = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
@@ -316,7 +316,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_statement(&mut self) -> Result<Node<'a>, String> {
 
     // A directive is identified by a directive marker.
-    if let Some(Token::DirectiveMarker) = self.current_token {
+    if let Some(Token::DirectiveMarker(_)) = self.current_token {
       let directive_node = try!(self.parse_directive());
       return Ok(directive_node);
     }

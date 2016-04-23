@@ -23,7 +23,7 @@ pub enum Token<'a> {
   /// A single-line comment. Value includes ';' but not the newline.
   SingleLineComment(&'a str, SourceFileLocation),
   /// A period.
-  DirectiveMarker,
+  DirectiveMarker(SourceFileLocation),
   /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
   Identifier(&'a str),
   /// A colon.
@@ -238,15 +238,17 @@ impl<'a> Scanner<'a> {
    @return A token representing a directive marker.
    */
   fn consume_directive_marker(&mut self) -> Token<'a> {
-    assert!(self.consume_char() == '.');
-    Token::DirectiveMarker
+    let (value, location) = self.consume_char();
+    assert!(value == '.');
+    Token::DirectiveMarker(location)
   }
   
   /**
    @return A token representing a label marker.
    */
   fn consume_label_marker(&mut self) -> Token<'a> {
-    assert!(self.consume_char() == ':');
+    let (value, _) = self.consume_char();
+    assert!(value == ':');
     Token::LabelMarker
   }
   
@@ -254,18 +256,18 @@ impl<'a> Scanner<'a> {
    @return A token representing a comma.
    */
   fn consume_comma(&mut self) -> Token<'a> {
-    assert!(self.consume_char() == ',');
+    let (value, _) = self.consume_char();
+    assert!(value == ',');
     Token::Comma
   }
   
   /**
    Consumes the next unicode code point.
-   @return The consumed character.
+   @return The consumed character and its location in the source file.
    */
-  fn consume_char(&mut self) -> char {
+  fn consume_char(&mut self) -> (char, SourceFileLocation) {
     let value = self.char_at(0);
-    self.advance_by(value.len_utf8());
-    value
+    (value, self.advance_by(value.len_utf8()))
   }
   
   /**
@@ -381,7 +383,7 @@ mod tests {
   fn test_directive_marker() {
     let mut scanner = Scanner::new(".");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::DirectiveMarker));
+    assert_eq!(scanner.next(), Some(Token::DirectiveMarker(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
