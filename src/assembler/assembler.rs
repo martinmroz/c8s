@@ -108,6 +108,10 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
 }
 
 /**
+ Resolves the label from the label map.
+ @param label The name of the label (case-sensitive).
+ @param label_map The mapping of labels to their resolved addresses.
+ @return The address from the label map if defined, or an error describing the failure.
  */
 fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, usize>) -> Result<U12, String> {
   match label_map.get(label) {
