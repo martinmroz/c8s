@@ -27,13 +27,13 @@ pub enum Token<'a> {
   /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
   Identifier(&'a str),
   /// A colon.
-  LabelMarker,
+  LabelMarker(SourceFileLocation),
   /// A string literal, contained in double-quotes. Quotes are not included in the value.
   StringLiteral(&'a str),
   /// A numeric literal value.
   NumericLiteral(usize),
   /// List separator token ','.
-  Comma,
+  Comma(SourceFileLocation),
   /// Newline, a run of either \r or \n.
   Newline,
   /// An including the reason that the tokenization failed.
@@ -247,18 +247,18 @@ impl<'a> Scanner<'a> {
    @return A token representing a label marker.
    */
   fn consume_label_marker(&mut self) -> Token<'a> {
-    let (value, _) = self.consume_char();
+    let (value, location) = self.consume_char();
     assert!(value == ':');
-    Token::LabelMarker
+    Token::LabelMarker(location)
   }
   
   /**
    @return A token representing a comma.
    */
   fn consume_comma(&mut self) -> Token<'a> {
-    let (value, _) = self.consume_char();
+    let (value, location) = self.consume_char();
     assert!(value == ',');
-    Token::Comma
+    Token::Comma(location)
   }
   
   /**
@@ -391,7 +391,7 @@ mod tests {
   fn test_label_marker() {
     let mut scanner = Scanner::new(":");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::LabelMarker));
+    assert_eq!(scanner.next(), Some(Token::LabelMarker(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
@@ -399,7 +399,7 @@ mod tests {
   fn test_comma() {
     let mut scanner = Scanner::new(",");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Comma));
+    assert_eq!(scanner.next(), Some(Token::Comma(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   

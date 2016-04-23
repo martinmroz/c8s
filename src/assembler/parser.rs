@@ -182,7 +182,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     result_list.push(literal);
 
     // A comma following the literal causes the rule to recurse.
-    if let Some(Token::Comma) = self.current_token {
+    if let Some(Token::Comma(_)) = self.current_token {
       let _ = self.consume_token();
       result_list = try!(self.parse_literal_list(result_list));
     }
@@ -213,7 +213,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_label(&mut self) -> Result<Node<'a>, String> {
     let identifier = try!(self.parse_identifier());
 
-    expect_and_consume!(self, Some(Token::LabelMarker));
+    expect_and_consume!(self, Some(Token::LabelMarker(_)));
 
     Ok(Node::Label {identifier: identifier})
   }
@@ -287,7 +287,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     result_list.push(field);
 
     // A comma following the field causes the rule to recurse.
-    if let Some(Token::Comma) = self.current_token {
+    if let Some(Token::Comma(_)) = self.current_token {
       let _ = self.consume_token();
       result_list = try!(self.parse_field_list(result_list));
     }
@@ -322,7 +322,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     }
 
     // A label is identified by an id followed by a label marker.
-    if let (&Some(Token::Identifier(_)), &Some(Token::LabelMarker)) = (&self.current_token, &self.next_token) {
+    if let (&Some(Token::Identifier(_)), &Some(Token::LabelMarker(_))) = (&self.current_token, &self.next_token) {
       let label_node = try!(self.parse_label());
       return Ok(label_node);
     }
@@ -399,7 +399,7 @@ mod tests {
     // A literal list cannot contain a comma alone.
     parser = Parser::new(Scanner::new(",\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err("Unexpected token found (Comma), expecting Numeric or String Literal.".to_string()));
+      Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Numeric or String Literal.".to_string()));
 
     // An empty literal list is valid.
     parser = Parser::new(Scanner::new("\n"));
@@ -462,7 +462,7 @@ mod tests {
     // A field list cannot contain a comma alone.
     parser = Parser::new(Scanner::new(",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected token found (Comma), expecting Instruction Field.".to_string()));
+      Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Instruction Field.".to_string()));
 
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("\"Hello\"\n"));
