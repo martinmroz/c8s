@@ -109,6 +109,21 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
 
 /**
  */
+fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, usize>) -> Result<U12, String> {
+  match label_map.get(label) {
+    Some(value) => Ok(value.as_u12().unwrap()),
+           None => Err(format!("Unable to resolve address of label {}", label))
+  }
+}
+
+/**
+ Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
+ label resolution map). Produces an error message in the event of failure.
+ @param mnemonic The (all lowercase) instruction mnemonic.
+ @param fields A vector of instruction fields.
+ @param label_map A reference to a map of labels to their defined address values.
+ @return The assembled instruction if successful or a string describing the failure otherwise.
+ */
 fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<u16, String> {
   let mut opcode: Option<Opcode> = None;
 
@@ -132,24 +147,16 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
 
       // The 'jp' mnemonic may reference a label.
       ("jp", &InstructionField::Identifier(label)) => {
-        match label_map.get(label) {
-          Some(value) => Some(Opcode::JP { target: value.as_u12().unwrap() }),
-          _ => {
-            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
-          }
-        }
+        let address = try!(resolve_label_with_map(label, label_map));
+        Some(Opcode::JP { target: address })
       }
 
       ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target.as_u12().unwrap() }),
 
       // The 'call' mnemonic may reference a label.
       ("call", &InstructionField::Identifier(label)) => {
-        match label_map.get(label) {
-          Some(value) => Some(Opcode::CALL { target: value.as_u12().unwrap() }),
-          _ => {
-            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
-          }
-        }
+        let address = try!(resolve_label_with_map(label, label_map));
+        Some(Opcode::CALL { target: address })
       }
 
       _ => None
@@ -223,26 +230,20 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
         Some(Opcode::LD_I { value: value.as_u12().unwrap() })
       }
 
+      // The mnemonic 'ld i' can take a label parameter.
       ("ld", &InstructionField::IndexRegister, &InstructionField::Identifier(label)) => {
-        match label_map.get(label) {
-          Some(value) => Some(Opcode::LD_I { value: value.as_u12().unwrap() }),
-          _ => {
-            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
-          }
-        }
+        let address = try!(resolve_label_with_map(label, label_map));
+        Some(Opcode::LD_I { value: address })
       }
 
       ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::NumericLiteral(value)) => {
         Some(Opcode::JP_V0 { value: value.as_u12().unwrap() })
       }
 
+      // The mnemonic 'jp v0' can take a label parameter.
       ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::Identifier(label)) => {
-        match label_map.get(label) {
-          Some(value) => Some(Opcode::JP_V0 { value: value.as_u12().unwrap() }),
-          _ => {
-            return Err(format!("Unable to resolve label {} for mnemonic {}", label, mnemonic));
-          }
-        }
+        let address = try!(resolve_label_with_map(label, label_map));
+        Some(Opcode::JP_V0 { value: address })
       }
 
       ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
