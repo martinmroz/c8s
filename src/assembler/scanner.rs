@@ -54,7 +54,7 @@ impl<'a> Scanner<'a> {
    */
   fn consume_whitespace(&mut self) {
     lazy_static! {
-       static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n]+").unwrap();
+       static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n\r]+").unwrap();
     }
     match WHITESPACE.find(&self.input[self.position .. ]) {
       Some((_, byte_index_end)) => { self.advance_by(byte_index_end); }
@@ -409,7 +409,7 @@ mod tests {
   fn test_newline() {
     let mut scanner = Scanner::new("\r\n\r\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,5))));
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(6,1))));
     assert_eq!(scanner.is_at_end(), true);
