@@ -130,7 +130,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return The string value of the identifier if successful, or an error.
    */
   fn parse_identifier(&mut self) -> Result<&'a str, String> {
-    if let Token::Identifier(identifier) = expect_and_consume!(self, Some(Token::Identifier(_))) {
+    if let Token::Identifier(identifier,_) = expect_and_consume!(self, Some(Token::Identifier(_,_))) {
       Ok(identifier)
     } else {
       Err(format!("Internal parser error, failure of expect_and_consume! macro."))
@@ -243,7 +243,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       }
 
       // An identiier was matched, which is either a Register or a Label.
-      Some(Token::Identifier(id)) => {
+      Some(Token::Identifier(id,_)) => {
         let identifier_field = match id {
 
           // Match special-purpose registers.
@@ -322,13 +322,13 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     }
 
     // A label is identified by an id followed by a label marker.
-    if let (&Some(Token::Identifier(_)), &Some(Token::LabelMarker(_))) = (&self.current_token, &self.next_token) {
+    if let (&Some(Token::Identifier(_,_)), &Some(Token::LabelMarker(_))) = (&self.current_token, &self.next_token) {
       let label_node = try!(self.parse_label());
       return Ok(label_node);
     }
 
     // Any remaining identifiers should be treated as instructions.
-    if let Some(Token::Identifier(_)) = self.current_token {
+    if let Some(Token::Identifier(_,_)) = self.current_token {
       let instruction_node = try!(self.parse_instruction());
       return Ok(instruction_node);
     }

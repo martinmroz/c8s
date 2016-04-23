@@ -25,7 +25,7 @@ pub enum Token<'a> {
   /// A period.
   DirectiveMarker(SourceFileLocation),
   /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
-  Identifier(&'a str),
+  Identifier(&'a str, SourceFileLocation),
   /// A colon.
   LabelMarker(SourceFileLocation),
   /// A string literal, contained in double-quotes. Quotes are not included in the value.
@@ -182,8 +182,8 @@ impl<'a> Scanner<'a> {
       Some((_, byte_index_end)) => {
         // Strip off the leading '$' and parse the hexadecimal value.
         let slice = &self.input[self.position .. self.position + byte_index_end];
-        self.advance_by(byte_index_end);
-        Token::Identifier(slice)
+        let location = self.advance_by(byte_index_end);
+        Token::Identifier(slice, location)
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
@@ -204,8 +204,8 @@ impl<'a> Scanner<'a> {
     if let (Some('['), Some('i'), Some(']')) = (char_iter.next(), char_iter.next(), char_iter.next()) {
       let length = "[i]".len();
       let slice = &self.input[self.position .. self.position + length];
-      self.advance_by(length);
-      return Token::Identifier(slice);
+      let location = self.advance_by(length);
+      return Token::Identifier(slice, location);
     }
     
     Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())
@@ -442,25 +442,25 @@ mod tests {
   #[test]
   fn test_identifier() {
     let mut scanner = Scanner::new("_ _a a _A A _0 _aA _zZ9");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_a")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("a")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_A")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("A")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_aA")));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_zZ9")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_a", SourceFileLocation::new(2,2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("a", SourceFileLocation::new(5,1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_A", SourceFileLocation::new(7,2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("A", SourceFileLocation::new(10,1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(12,2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_aA", SourceFileLocation::new(15,3))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_zZ9", SourceFileLocation::new(19,4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new("_&");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
     assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string())));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new("_$0");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
@@ -469,7 +469,7 @@ mod tests {
   #[test]
   fn test_index_register_indirect() {
     let mut scanner = Scanner::new("[i] [a]");
-    assert_eq!(scanner.next(), Some(Token::Identifier("[i]")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("[i]", SourceFileLocation::new(0,3))));
     assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())));
   }
   
@@ -484,7 +484,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF)));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF)));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1)));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(29,2))));
     assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string())));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
@@ -501,7 +501,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(255)));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095)));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(1)));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0")));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(24,2))));
     assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
