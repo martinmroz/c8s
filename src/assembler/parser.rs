@@ -172,7 +172,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
     
     // The literal list is complete.
-    if let Some(Token::Newline) = self.current_token {
+    if let Some(Token::Newline(_)) = self.current_token {
       return Ok(list);
     }
 
@@ -229,7 +229,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
 
     // The field list is complete.
-    if let Some(Token::Newline) = self.current_token {
+    if let Some(Token::Newline(_)) = self.current_token {
       return Ok(list);
     }
 
@@ -348,7 +348,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       match self.current_token {
 
         // A single-line comment or newline is consumed in place.
-        Some(Token::SingleLineComment(_, _)) | Some(Token::Newline) => {
+        Some(Token::SingleLineComment(_, _)) | Some(Token::Newline(_)) => {
           let _ = self.consume_token();
         }
 

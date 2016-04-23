@@ -34,8 +34,8 @@ pub enum Token<'a> {
   NumericLiteral(usize),
   /// List separator token ','.
   Comma(SourceFileLocation),
-  /// Newline, a run of either \r or \n.
-  Newline,
+  /// Newline, a \n character.
+  Newline(SourceFileLocation),
   /// An including the reason that the tokenization failed.
   Error(String)
 }
@@ -73,13 +73,13 @@ impl<'a> Scanner<'a> {
     for c in self.input[self.position .. ].chars() {
       if c == '\r' || c == '\n' {
         bytes = bytes + c.len_utf8();
-      } else { 
+      } else {
         break;
       }
     }
     
-    self.advance_by(bytes);
-    Token::Newline
+    let location = self.advance_by(bytes);
+    Token::Newline(location)
   }
   
   /**
@@ -409,9 +409,9 @@ mod tests {
   fn test_newline() {
     let mut scanner = Scanner::new("\r\n\r\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(6,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
 
@@ -426,14 +426,14 @@ mod tests {
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new("; Single-Line Comment\n");
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment", SourceFileLocation::new(0,21))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(21,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
