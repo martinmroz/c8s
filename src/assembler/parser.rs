@@ -247,10 +247,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
         let identifier_field = match id {
 
           // Match special-purpose registers.
-          "dt" => InstructionField::DelayTimer,
-          "st" => InstructionField::SoundTimer,
-           "i" => InstructionField::IndexRegister,
-           "k" => InstructionField::KeypadRegister,
+           "dt" => InstructionField::DelayTimer,
+           "st" => InstructionField::SoundTimer,
+            "i" => InstructionField::IndexRegister,
+          "[i]" => InstructionField::IndexRegisterIndirect,
+            "k" => InstructionField::KeypadRegister,
 
           // Now it's a GPR or an Identifier.
           identifier_string @ _ => {
@@ -485,9 +486,10 @@ mod tests {
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::KeypadRegister]));
     parser = Parser::new(Scanner::new("i\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegister]));
+    parser = Parser::new(Scanner::new("[i]\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegisterIndirect]));
     parser = Parser::new(Scanner::new("LABEL\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Identifier("LABEL")]));
-    // TODO: Add a test for Index Register Indirect mode ([i]).
 
     // A field list can end in a trailing comma.
     parser = Parser::new(Scanner::new("$FF,\n"));

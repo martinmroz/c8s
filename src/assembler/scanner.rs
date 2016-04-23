@@ -175,6 +175,24 @@ impl<'a> Scanner<'a> {
       }
     }
   }
+
+  /**
+   Consumes an Index Register Indirect identifier, [i].
+   @return A token containing the identifier, or Error in case of invalid formatting.
+   */
+  fn consume_index_register_indirect(&mut self) -> Token<'a> {
+    let mut char_iter = self.input[self.position .. ].chars();
+
+    // The Index Register Indirect identifier, [i] is consumed as an identifier.
+    if let (Some('['), Some('i'), Some(']')) = (char_iter.next(), char_iter.next(), char_iter.next()) {
+      let length = "[i]".len();
+      let slice = &self.input[self.position .. self.position + length];
+      self.advance_by(length);
+      return Token::Identifier(slice);
+    }
+    
+    Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())
+  }
   
   /**
    Consumes a single-line comment, beginning with a ';' and ending with '\r' or '\n'.
@@ -270,6 +288,7 @@ impl<'a> Scanner<'a> {
       ',' => { Some(self.consume_comma()) }
       '"' => { Some(self.consume_string_literal()) }
       '$' => { Some(self.consume_hex_literal()) }
+      '[' => { Some(self.consume_index_register_indirect()) }
       
       '0' ... '9' => {
         Some(self.consume_decimal_literal()) 
@@ -423,6 +442,13 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
+  }
+
+  #[test]
+  fn test_index_register_indirect() {
+    let mut scanner = Scanner::new("[i] [a]");
+    assert_eq!(scanner.next(), Some(Token::Identifier("[i]")));
+    assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())));
   }
   
   #[test]
