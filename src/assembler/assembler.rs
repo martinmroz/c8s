@@ -109,7 +109,7 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal<'a>>) -> u
 
 /**
  */
-fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<Vec<u8>, String> {
+fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<u16, String> {
   let mut opcode: Option<Opcode> = None;
 
   // Mnemonics with zero parameters.
@@ -130,7 +130,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
 
       ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target.as_u12().unwrap() }),
 
-      // The 'jp' instruction may reference a label.
+      // The 'jp' mnemonic may reference a label.
       ("jp", &InstructionField::Identifier(label)) => {
         match label_map.get(label) {
           Some(value) => Some(Opcode::JP { target: value.as_u12().unwrap() }),
@@ -142,7 +142,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
 
       ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target.as_u12().unwrap() }),
 
-      // The 'call' instruction may reference a label.
+      // The 'call' mnemonic may reference a label.
       ("call", &InstructionField::Identifier(label)) => {
         match label_map.get(label) {
           Some(value) => Some(Opcode::CALL { target: value.as_u12().unwrap() }),
@@ -311,13 +311,8 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
 
   // Assemble the matched instruction.
   match opcode {
-    None => { Err(format!("Unable to assemble instruction {} {:?}", mnemonic, fields)) }
-    Some(value) => {
-      let instruction: u16 = value.as_instruction();
-      let hi_8 = ((instruction & 0xFF00) >> 8) as u8;
-      let lo_8 = ((instruction & 0x00FF) >> 0) as u8;
-      Ok(vec![hi_8, lo_8])
-    }
+    None => Err(format!("Unable to assemble instruction {} {:?}", mnemonic, fields)),
+    Some(value) => Ok(value.as_instruction())
   }
 }
 
@@ -415,9 +410,12 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
       }
 
       Node::Instruction { mnemonic, fields } => {
-        // Verify the semantics and convert the instruction into a byte array.
-        let bytes = try!(assemble_instruction(mnemonic, fields, label_address_map));
-        current_range.data.extend(bytes);
+        // Verify the semantics and append the instruction to the output buffer.
+        let instruction_word = try!(assemble_instruction(mnemonic, fields, label_address_map));
+        let hi_8 = ((instruction_word & 0xFF00) >> 8) as u8;
+        let lo_8 = ((instruction_word & 0x00FF) >> 8) as u8;
+        current_range.data.push(hi_8);
+        current_range.data.push(lo_8);
       }
 
       Node::Label { identifier: _ } => {
