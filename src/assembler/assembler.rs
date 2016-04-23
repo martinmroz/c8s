@@ -420,8 +420,8 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
         current_range.data.extend(bytes);
       }
 
-      _ => {
-        panic!("Internal assembler error: Labels not filtered before call to emit_data_ranges().");
+      Node::Label { identifier: _ } => {
+        // Processed in Pass 1.
       }
     }
   }
