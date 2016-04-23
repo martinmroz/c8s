@@ -8,7 +8,7 @@ use assembler::parser::{Literal, Node, InstructionField};
 
 // MARK: - Result Type
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct DataRange {
   /// The first address populated by the bytes in the range.
   pub start_address: usize,
@@ -332,7 +332,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
      the map of labels to their corresponding addresses) on success or a string describing
      the reason the first pass failed.
  */
-fn filter_and_define_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<'a>>, BTreeMap<&'a str, usize>), String> {
+fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, usize>, String> {
   let mut label_address_map = BTreeMap::new();
   let mut current_address = 0x000;
 
@@ -368,17 +368,8 @@ fn filter_and_define_labels<'a>(syntax_list: Vec<Node<'a>>) -> Result<(Vec<Node<
     }
   }
 
-  // Remove any label nodes from the ASL as they have now been resolved.
-  let filtered_asl = syntax_list.into_iter().filter(|node| {
-    match *node {
-      Node::Label { identifier: _ } => false,
-      Node::Directive { identifier: _, arguments: _ } => true,
-      Node::Instruction { mnemonic: _, fields: _ } => true
-    }
-  }).collect();
-
   // Semantic analysis for directives and labels is complete.
-  Ok((filtered_asl, label_address_map))
+  Ok(label_address_map)
 }
 
 // MARK: - Pass 2: Emit Bytes
@@ -446,8 +437,8 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-    let (filtered_syntax_list, label_address_map) = try!(filter_and_define_labels(syntax_list));
-    emit_data_ranges(filtered_syntax_list, &label_address_map)
+    let label_address_map = try!(define_labels(&syntax_list));
+    emit_data_ranges(syntax_list, &label_address_map)
 }
 
 // MARK: - Tests
@@ -457,7 +448,7 @@ mod tests {
   
   use super::*;
   use super::{validate_directive_semantics, size_of_directive};
-  use super::filter_and_define_labels;
+  use super::define_labels;
 
   use assembler::parser::*;
 
@@ -525,7 +516,7 @@ mod tests {
   }
 
   #[test]
-  fn test_filter_and_define_labels() {
+  fn test_define_labels() {
     let program = vec![
       Node::Directive   { identifier: "org", arguments: vec![Literal::Numeric(0x100)] },
       Node::Label       { identifier: "label1" },
@@ -535,7 +526,7 @@ mod tests {
       Node::Label       { identifier: "label3" }
     ];
 
-    let result = filter_and_define_labels(program);
+    let result = define_labels(&program);
 
     // Assert that semantic analysis passed.
     if let Err(reason) = result {
@@ -544,46 +535,42 @@ mod tests {
     }
 
     // Verify that the 
-    if let Ok((filtered_asl, label_map)) = result {
+    if let Ok(label_map) = result {
       assert_eq!(label_map.len(), 3);
       assert_eq!(label_map.get("label1").unwrap(), &0x100);
       assert_eq!(label_map.get("label2").unwrap(), &0x101);
       assert_eq!(label_map.get("label3").unwrap(), &0x103);
-      assert_eq!(filtered_asl.len(), 3);
-      assert_eq!(filtered_asl.get(0).unwrap(), &Node::Directive { identifier: "org", arguments: vec![Literal::Numeric(0x100)] });
-      assert_eq!(filtered_asl.get(1).unwrap(), &Node::Directive { identifier: "db",  arguments: vec![Literal::Numeric(0xFF)] });
-      assert_eq!(filtered_asl.get(2).unwrap(), &Node::Instruction { mnemonic: "trap", fields: vec![] });
     }
   }
 
   #[test]
-  fn test_filter_and_define_labels_does_semantic_analysis_on_org() {
+  fn test_define_labels_does_semantic_analysis_on_org() {
     let program = vec![
       Node::Directive { identifier: "org", arguments: vec![] },
     ];
 
-    let result = filter_and_define_labels(program);
+    let result = define_labels(&program);
     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
   }
 
   #[test]
-  fn test_filter_and_define_labels_does_semantic_analysis_on_db() {
+  fn test_define_labels_does_semantic_analysis_on_db() {
     let program = vec![
       Node::Directive { identifier: "db", arguments: vec![] },
     ];
 
-    let result = filter_and_define_labels(program);
+    let result = define_labels(&program);
     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
   }
 
   #[test]
-  fn test_filter_and_define_labels_fails_on_redefinition() {
+  fn test_define_labels_fails_on_redefinition() {
     let program = vec![
       Node::Label { identifier: "L1" },
       Node::Label { identifier: "L1" }
     ];
 
-    let result = filter_and_define_labels(program);
+    let result = define_labels(&program);
     assert_eq!(result, Err("Attempted re-definition of label L1.".to_string()));
   }
 

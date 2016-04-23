@@ -6,6 +6,7 @@ pub mod assembler;
 
 use assembler::scanner::Scanner;
 use assembler::parser::*;
+use assembler::assembler::*;
 
 use std::io::prelude::*;
 use std::fs::File;
@@ -30,9 +31,10 @@ fn main() {
   let scanner = Scanner::new(buffer.as_str());
   match parse(scanner) {
     Ok(asl) => {
-      for node in asl {
-        println!("{:?}", node);
+      for node in asl.iter() {
+        println!("{:?}", *node);
       }
+      println!("{:?}", assemble(asl));
     }
     Err(reason) => {
       println!("Parse failed: {}", reason);
