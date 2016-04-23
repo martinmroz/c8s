@@ -348,7 +348,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       match self.current_token {
 
         // A single-line comment or newline is consumed in place.
-        Some(Token::SingleLineComment(_)) | Some(Token::Newline) => {
+        Some(Token::SingleLineComment(_, _)) | Some(Token::Newline) => {
           let _ = self.consume_token();
         }
 

@@ -2,9 +2,26 @@
 use regex::Regex;
 
 #[derive(PartialEq, Debug, Clone)]
+pub struct SourceFileLocation {
+  /// The offset from the start of input, in bytes.
+  location: usize,
+  /// The length of the region, in bytes.
+  length: usize
+}
+
+impl SourceFileLocation {
+  fn new(location: usize, length: usize) -> SourceFileLocation {
+    SourceFileLocation {
+      location: location,
+      length: length
+    }
+  }
+}
+
+#[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
   /// A single-line comment. Value includes ';' but not the newline.
-  SingleLineComment(&'a str),
+  SingleLineComment(&'a str, SourceFileLocation),
   /// A period.
   DirectiveMarker,
   /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
@@ -213,8 +230,8 @@ impl<'a> Scanner<'a> {
     }
     
     let slice = &self.input[self.position .. self.position + bytes];
-    self.advance_by(bytes);
-    Token::SingleLineComment(slice)
+    let location = self.advance_by(bytes);
+    Token::SingleLineComment(slice, location)
   }
   
   /**
@@ -260,11 +277,14 @@ impl<'a> Scanner<'a> {
   
   /**
    Advances the position counter by the specified number of bytes.
+   @return The source file location corresponding to the region advanced over.
    */
-  fn advance_by(&mut self, bytes: usize) {
+  fn advance_by(&mut self, bytes: usize) -> SourceFileLocation {
+    let location = SourceFileLocation::new(self.position, bytes);
     self.position += bytes;
+    location
   }
-  
+
   /**
    @return true if the scanner has reached the end of the input.
    */
@@ -397,19 +417,19 @@ mod tests {
   fn test_comment() {
     let mut scanner = Scanner::new(";");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";")));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new(";\n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";")));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::Newline));
     assert_eq!(scanner.is_at_end(), true);
     
     scanner = Scanner::new("; Single-Line Comment\n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment")));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment", SourceFileLocation::new(0,21))));
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::Newline));
     assert_eq!(scanner.is_at_end(), true);

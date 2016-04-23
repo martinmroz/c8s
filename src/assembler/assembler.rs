@@ -449,7 +449,6 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String
 #[cfg(test)]
 mod tests {
   
-  use super::*;
   use super::{validate_directive_semantics, size_of_directive};
   use super::define_labels;
 
