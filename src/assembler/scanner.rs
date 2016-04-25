@@ -54,7 +54,7 @@ impl<'a> Scanner<'a> {
    */
   fn consume_whitespace(&mut self) {
     lazy_static! {
-       static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n\r]+").unwrap();
+       static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n]+").unwrap();
     }
     match WHITESPACE.find(&self.input[self.position .. ]) {
       Some((_, byte_index_end)) => { self.advance_by(byte_index_end); }
@@ -403,15 +403,22 @@ mod tests {
   // MARK: - Non-Coding
   
   #[test]
-  fn test_newline() {
+  fn test_newline_ignores_windows_terminators() {
     let mut scanner = Scanner::new("\n\r\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid character \'\r\'".to_string(), SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(2,1))));
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(3,1))));
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(5,1))));
     assert_eq!(scanner.is_at_end(), true);
+  }
 
-    scanner = Scanner::new("\n\n \n");
+  #[test]
+  fn test_newline() {
+    let mut scanner = Scanner::new("\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), false);
