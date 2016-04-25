@@ -37,7 +37,7 @@ pub enum Token<'a> {
   /// Newline, a \n character.
   Newline(SourceFileLocation),
   /// An including the reason that the tokenization failed.
-  Error(String)
+  Error(String, SourceFileLocation)
 }
 
 pub struct Scanner<'a> {
@@ -63,22 +63,11 @@ impl<'a> Scanner<'a> {
   }
 
   /**
-   Matches a run of newline characters.
+   Matches a single newline character.
    */
   fn consume_newline(&mut self) -> Token<'a> {
-    assert!(self.char_at(0) == '\r' || self.char_at(0) == '\n');
-    
-    // Determine how many bytes to consume in the run.
-    let mut bytes = 0;
-    for c in self.input[self.position .. ].chars() {
-      if c == '\r' || c == '\n' {
-        bytes = bytes + c.len_utf8();
-      } else {
-        break;
-      }
-    }
-    
-    let location = self.advance_by(bytes);
+    let (value, location) = self.consume_char();
+    assert!(value == '\n');
     Token::Newline(location)
   }
   
@@ -103,8 +92,9 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
+        let location = SourceFileLocation::new(self.position, 1);
         self.position = self.input.len();
-        Token::Error("Invalid quoted string literal.".to_string())
+        Token::Error("Invalid quoted string literal.".to_string(), location)
       }
     }
   }
@@ -128,8 +118,9 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
+        let location = SourceFileLocation::new(self.position, 1);
         self.position = self.input.len();
-        Token::Error("Invalid hexadecimal literal starting with ($).".to_string())
+        Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), location)
       }
     }
   }
@@ -157,15 +148,17 @@ impl<'a> Scanner<'a> {
           }
           _ => {
             // Push to the end of the input to indicate parse failure.
+            let location = SourceFileLocation::new(self.position, byte_index_end);
             self.position = self.input.len();
-            Token::Error(format!("Decimal literal {} out of range (0...4095).", slice))
+            Token::Error(format!("Decimal literal {} out of range (0...4095).", slice), location)
           }
         }
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
+        let location = SourceFileLocation::new(self.position, 1);
         self.position = self.input.len();
-        Token::Error("Invalid hexadecimal literal starting with ($).".to_string())
+        Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), location)
       }
     }
   }
@@ -187,8 +180,9 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
+        let location = SourceFileLocation::new(self.position, 1);
         self.position = self.input.len();
-        Token::Error("Invalid identifier.".to_string())
+        Token::Error("Invalid identifier.".to_string(), location)
       }
     }
   }
@@ -208,11 +202,13 @@ impl<'a> Scanner<'a> {
       return Token::Identifier(slice, location);
     }
     
-    Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())
+    let location = SourceFileLocation::new(self.position, 1);
+    self.position = self.input.len();
+    Token::Error("Expected Index Register Indirect ([i]) not found.".to_string(), location)
   }
   
   /**
-   Consumes a single-line comment, beginning with a ';' and ending with '\r' or '\n'.
+   Consumes a single-line comment, beginning with a ';' and ending with '\n'.
    This method will panic if the first character to be processed is not a ';'.
    @return A token containing the entirety of the comment, including the ';' but not the newline.
    */
@@ -222,7 +218,7 @@ impl<'a> Scanner<'a> {
     // Determine how many bytes to consume, including the ';' but not the \n.
     let mut bytes = 0;
     for c in self.input[self.position .. ].chars() {
-      if c == '\r' || c == '\n' {
+      if c == '\n' {
         break;
       } else { 
         bytes = bytes + c.len_utf8();
@@ -320,14 +316,15 @@ impl<'a> Scanner<'a> {
         Some(self.consume_identifier()) 
       }
 
-      '\r' | '\n' => {
+      '\n' => {
         Some(self.consume_newline())
       }
        
       c @ _  => { 
         // Advance to end of input on invalid token.
+        let location = SourceFileLocation::new(self.position, 1);
         self.position = self.input.len();
-        Some(Token::Error(format!("Invalid character '{}'", c)))
+        Some(Token::Error(format!("Invalid character '{}'", c), location))
       }
     }
   }
@@ -407,11 +404,20 @@ mod tests {
   
   #[test]
   fn test_newline() {
-    let mut scanner = Scanner::new("\r\n\r\n\n \n");
+    let mut scanner = Scanner::new("\n\r\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,5))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(6,1))));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid character \'\r\'".to_string(), SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.is_at_end(), true);
+
+    scanner = Scanner::new("\n\n \n");
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.is_at_end(), false);
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(3,1))));
     assert_eq!(scanner.is_at_end(), true);
   }
 
@@ -455,7 +461,7 @@ mod tests {
     
     scanner = Scanner::new("_&");
     assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string())));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string(), SourceFileLocation::new(1,1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
@@ -470,7 +476,7 @@ mod tests {
   fn test_index_register_indirect() {
     let mut scanner = Scanner::new("[i] [a]");
     assert_eq!(scanner.next(), Some(Token::Identifier("[i]", SourceFileLocation::new(0,3))));
-    assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string())));
+    assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string(), SourceFileLocation::new(4,1))));
   }
   
   #[test]
@@ -485,7 +491,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new(22,4))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new(27,2))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(29,2))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string())));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), SourceFileLocation::new(32,1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
@@ -502,7 +508,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new(18,4))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new(23,1))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(24,2))));
-    assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."))));
+    assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."), SourceFileLocation::new(27,4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
@@ -513,7 +519,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new(0,2))));
     assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new(3,3))));
     assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new(7,5))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string())));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string(), SourceFileLocation::new(13,1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
