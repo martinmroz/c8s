@@ -146,7 +146,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     match self.current_token {
 
       // Match and consume a string literal token.
-      Some(Token::StringLiteral(string)) => {
+      Some(Token::StringLiteral(string, _)) => {
         let _ = self.consume_token();
         Ok(Literal::String(string))
       }
@@ -467,7 +467,7 @@ mod tests {
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected token found (StringLiteral(\"Hello\")), expecting Instruction Field.".to_string()));
+      Err("Unexpected token found (StringLiteral(\"Hello\", SourceFileLocation { location: 0, length: 7 })), expecting Instruction Field.".to_string()));
 
     // An empty field list is valid.
     parser = Parser::new(Scanner::new("\n"));

@@ -29,7 +29,7 @@ pub enum Token<'a> {
   /// A colon.
   LabelMarker(SourceFileLocation),
   /// A string literal, contained in double-quotes. Quotes are not included in the value.
-  StringLiteral(&'a str),
+  StringLiteral(&'a str, SourceFileLocation),
   /// A numeric literal value.
   NumericLiteral(usize),
   /// List separator token ','.
@@ -98,8 +98,8 @@ impl<'a> Scanner<'a> {
         let slice_start = self.position + '"'.len_utf8();
         let slice_end = self.position + byte_index_end - '"'.len_utf8();
         let slice = &self.input[slice_start .. slice_end];
-        self.advance_by(byte_index_end);
-        Token::StringLiteral(slice)
+        let location = self.advance_by(byte_index_end);
+        Token::StringLiteral(slice, location)
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
@@ -510,9 +510,9 @@ mod tests {
   #[test]
   fn test_string_literal() {
     let mut scanner = Scanner::new("\"\" \"a\" \"123\" \"end-of-line");
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("")));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("a")));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("123")));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new(0,2))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new(3,3))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new(7,5))));
     assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string())));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
