@@ -152,7 +152,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       }
 
       // Match and consume a numeric literal token.
-      Some(Token::NumericLiteral(number)) => {
+      Some(Token::NumericLiteral(number, _)) => {
         let _ = self.consume_token();
         Ok(Literal::Numeric(number))
       }
@@ -236,7 +236,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     let field = match self.current_token {
 
       // A numeric literal parameter was matched.
-      Some(Token::NumericLiteral(number)) => {
+      Some(Token::NumericLiteral(number, _)) => {
         let literal = InstructionField::NumericLiteral(number);
         let _ = self.consume_token();
         literal

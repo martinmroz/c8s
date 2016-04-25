@@ -31,7 +31,7 @@ pub enum Token<'a> {
   /// A string literal, contained in double-quotes. Quotes are not included in the value.
   StringLiteral(&'a str, SourceFileLocation),
   /// A numeric literal value.
-  NumericLiteral(usize),
+  NumericLiteral(usize, SourceFileLocation),
   /// List separator token ','.
   Comma(SourceFileLocation),
   /// Newline, a \n character.
@@ -123,8 +123,8 @@ impl<'a> Scanner<'a> {
         let slice_start = self.position + '$'.len_utf8();
         let slice_end = self.position + byte_index_end;
         let slice = &self.input[slice_start .. slice_end];
-        self.advance_by(byte_index_end);
-        Token::NumericLiteral(usize::from_str_radix(slice, 16).ok().unwrap())
+        let location = self.advance_by(byte_index_end);
+        Token::NumericLiteral(usize::from_str_radix(slice, 16).ok().unwrap(), location)
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
@@ -152,8 +152,8 @@ impl<'a> Scanner<'a> {
         // Match on a decimal literal in the range 0...4095
         match usize::from_str_radix(slice, 10).ok() {
           Some(value) if value <= 4095 => {
-            self.advance_by(byte_index_end);
-            Token::NumericLiteral(value)
+            let location = self.advance_by(byte_index_end);
+            Token::NumericLiteral(value, location)
           }
           _ => {
             // Push to the end of the input to indicate parse failure.
@@ -461,7 +461,7 @@ mod tests {
     
     scanner = Scanner::new("_$0");
     assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(1,2))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
@@ -476,14 +476,14 @@ mod tests {
   #[test]
   fn test_numeric_literal_hex() {
     let mut scanner = Scanner::new("$0 $00 $000 $1 $F $FF $1FF $1_0 $");
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1)));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new(0,2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new(3,3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new(7,4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new(12,2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF, SourceFileLocation::new(15,2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF, SourceFileLocation::new(18,3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new(22,4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new(27,2))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(29,2))));
     assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string())));
     assert_eq!(scanner.next(), None);
@@ -493,14 +493,14 @@ mod tests {
   #[test]
   fn test_numeric_literal_dec() {
     let mut scanner = Scanner::new("0 00 000 1 15 255 4095 1_0 4096");
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(15)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(255)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095)));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1)));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(2,2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(5,3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new(9,1))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(15, SourceFileLocation::new(11,2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(255, SourceFileLocation::new(14,3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new(18,4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new(23,1))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(24,2))));
     assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."))));
     assert_eq!(scanner.next(), None);
