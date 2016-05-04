@@ -1,17 +1,39 @@
 
 use regex::Regex;
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct SourceFileLocation {
-  /// The offset from the start of input, in bytes.
+use std::fmt;
+
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct SourceFileLocation<'a> {
+  /// The display name of the source file (usually last path component).
+  file_name: &'a str,
+  /// The line number corresponding to the range.
+  line: usize,
+  /// The offset from the start of input, in bytes, starting at 1.
   location: usize,
   /// The length of the region, in bytes.
   length: usize
 }
 
-impl SourceFileLocation {
-  fn new(location: usize, length: usize) -> SourceFileLocation {
+impl<'a> fmt::Display for SourceFileLocation<'a> {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}:{}:{}-{}", self.file_name, self.line, self.location, self.location + self.length)
+  }
+}
+
+impl<'a> SourceFileLocation<'a> {
+  /**
+   Creates a new source file location.
+   @param file_name The display name of the source file (usually last path component).
+   @param line The line number within the source file, starting at 1. Asserts if 0.
+   @param location The offset from the start of the input, in code points, starting at 1. Asserts if 0.
+   @param length The number of code points corresponding to the location. Asserts if 0.
+   */
+  fn new(file_name: &'a str, line: usize, location: usize, length: usize) -> SourceFileLocation<'a> {
+    assert!(location > 0 && length > 0);
     SourceFileLocation {
+      file_name: file_name,
+      line: line,
       location: location,
       length: length
     }
@@ -21,30 +43,36 @@ impl SourceFileLocation {
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
   /// A single-line comment. Value includes ';' but not the newline.
-  SingleLineComment(&'a str, SourceFileLocation),
+  SingleLineComment(&'a str, SourceFileLocation<'a>),
   /// A period.
-  DirectiveMarker(SourceFileLocation),
+  DirectiveMarker(SourceFileLocation<'a>),
   /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
-  Identifier(&'a str, SourceFileLocation),
+  Identifier(&'a str, SourceFileLocation<'a>),
   /// A colon.
-  LabelMarker(SourceFileLocation),
+  LabelMarker(SourceFileLocation<'a>),
   /// A string literal, contained in double-quotes. Quotes are not included in the value.
-  StringLiteral(&'a str, SourceFileLocation),
+  StringLiteral(&'a str, SourceFileLocation<'a>),
   /// A numeric literal value.
-  NumericLiteral(usize, SourceFileLocation),
+  NumericLiteral(usize, SourceFileLocation<'a>),
   /// List separator token ','.
-  Comma(SourceFileLocation),
+  Comma(SourceFileLocation<'a>),
   /// Newline, a \n character.
-  Newline(SourceFileLocation),
+  Newline(SourceFileLocation<'a>),
   /// An including the reason that the tokenization failed.
-  Error(String, SourceFileLocation)
+  Error(String, SourceFileLocation<'a>)
 }
 
 pub struct Scanner<'a> {
+  /// The display name of the source file (usually last path component).
+  file_name: &'a str,
   /// Input string to process.
   input: &'a str,
   /// Offset from the start of input, in bytes, not in code points.
-  position: usize
+  position: usize,
+  /// Tracks the current line number, starting at 1.
+  current_line: usize,
+  /// Tracks the offset within the current line, in code points, starting at 1.
+  current_line_offset: usize
 }
 
 impl<'a> Scanner<'a> {
@@ -92,7 +120,7 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
-        let location = SourceFileLocation::new(self.position, 1);
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Token::Error("Invalid quoted string literal.".to_string(), location)
       }
@@ -118,7 +146,7 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
-        let location = SourceFileLocation::new(self.position, 1);
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), location)
       }
@@ -148,7 +176,8 @@ impl<'a> Scanner<'a> {
           }
           _ => {
             // Push to the end of the input to indicate parse failure.
-            let location = SourceFileLocation::new(self.position, byte_index_end);
+            // TODO: Length does not correspond between bytes and characters.
+            let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, byte_index_end);
             self.position = self.input.len();
             Token::Error(format!("Decimal literal {} out of range (0...4095).", slice), location)
           }
@@ -156,7 +185,7 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
-        let location = SourceFileLocation::new(self.position, 1);
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), location)
       }
@@ -180,7 +209,7 @@ impl<'a> Scanner<'a> {
       }
       None => {
         // Advance to the end of the input to terminate the parse and indicate failure.
-        let location = SourceFileLocation::new(self.position, 1);
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Token::Error("Invalid identifier.".to_string(), location)
       }
@@ -202,7 +231,7 @@ impl<'a> Scanner<'a> {
       return Token::Identifier(slice, location);
     }
     
-    let location = SourceFileLocation::new(self.position, 1);
+    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
     self.position = self.input.len();
     Token::Error("Expected Index Register Indirect ([i]) not found.".to_string(), location)
   }
@@ -261,7 +290,7 @@ impl<'a> Scanner<'a> {
    Consumes the next unicode code point.
    @return The consumed character and its location in the source file.
    */
-  fn consume_char(&mut self) -> (char, SourceFileLocation) {
+  fn consume_char(&mut self) -> (char, SourceFileLocation<'a>) {
     let value = self.char_at(0);
     (value, self.advance_by(value.len_utf8()))
   }
@@ -277,8 +306,9 @@ impl<'a> Scanner<'a> {
    Advances the position counter by the specified number of bytes.
    @return The source file location corresponding to the region advanced over.
    */
-  fn advance_by(&mut self, bytes: usize) -> SourceFileLocation {
-    let location = SourceFileLocation::new(self.position, bytes);
+  fn advance_by(&mut self, bytes: usize) -> SourceFileLocation<'a> {
+    // TODO: Bytes do not line up with characters.
+    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, bytes);
     self.position += bytes;
     location
   }
@@ -322,7 +352,7 @@ impl<'a> Scanner<'a> {
        
       c @ _  => { 
         // Advance to end of input on invalid token.
-        let location = SourceFileLocation::new(self.position, 1);
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Some(Token::Error(format!("Invalid character '{}'", c), location))
       }
@@ -332,10 +362,13 @@ impl<'a> Scanner<'a> {
   /**
    @return A new scanner over the provided input.
    */
-  pub fn new(input: &'a str) -> Scanner<'a> {
+  pub fn new(file_name: &'a str, input: &'a str) -> Scanner<'a> {
     Scanner {
+      file_name: file_name,
       input: input,
-      position: 0
+      position: 0,
+      current_line: 1,
+      current_line_offset: 1
     }
   }
   

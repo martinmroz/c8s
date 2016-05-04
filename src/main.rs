@@ -28,7 +28,7 @@ fn main() {
       .expect(format!("Unable to read contents of file {}", path).as_str());
 
   // Create a scanner to process the contents.
-  let scanner = Scanner::new(buffer.as_str());
+  let scanner = Scanner::new("test.S", buffer.as_str());
   match parse(scanner) {
     Ok(asl) => {
       for node in asl.iter() {
