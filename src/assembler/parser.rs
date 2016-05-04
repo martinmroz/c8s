@@ -399,7 +399,7 @@ mod tests {
     // A literal list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Numeric or String Literal.".to_string()));
+      Err("Unexpected token found (Comma(SourceFileLocation { file_name: \"-\", line: 1, location: 1, length: 1 })), expecting Numeric or String Literal.".to_string()));
 
     // An empty literal list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
@@ -462,12 +462,12 @@ mod tests {
     // A field list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Instruction Field.".to_string()));
+      Err("Unexpected token found (Comma(SourceFileLocation { file_name: \"-\", line: 1, location: 1, length: 1 })), expecting Instruction Field.".to_string()));
 
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected token found (StringLiteral(\"Hello\", SourceFileLocation { location: 0, length: 7 })), expecting Instruction Field.".to_string()));
+      Err("Unexpected token found (StringLiteral(\"Hello\", SourceFileLocation { file_name: \"-\", line: 1, location: 1, length: 7 })), expecting Instruction Field.".to_string()));
 
     // An empty field list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
