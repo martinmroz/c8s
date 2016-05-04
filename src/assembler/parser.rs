@@ -392,36 +392,36 @@ mod tests {
   #[test]
   fn test_parse_literal_list() {
     // A literal list expects to be terminated by a newline.
-    let mut parser = Parser::new(Scanner::new(""));
+    let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
       Err("Unexpected end-of-file reached. Expecting Numeric or String Literal.".to_string()));
 
     // A literal list cannot contain a comma alone.
-    parser = Parser::new(Scanner::new(",\n"));
+    parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
       Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Numeric or String Literal.".to_string()));
 
     // An empty literal list is valid.
-    parser = Parser::new(Scanner::new("\n"));
+    parser = Parser::new(Scanner::new("-", "\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![]));
 
     // A literal list can contain a single item.
-    parser = Parser::new(Scanner::new("1\n"));
+    parser = Parser::new(Scanner::new("-", "1\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::Numeric(1)]));
-    parser = Parser::new(Scanner::new("\"Hello\"\n"));
+    parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String("Hello")]));
 
     // A literal list can end in a trailing comma.
-    parser = Parser::new(Scanner::new("1,\n"));
+    parser = Parser::new(Scanner::new("-", "1,\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::Numeric(1)]));
 
     // A literal can contain multiple items of the same type.
-    parser = Parser::new(Scanner::new("1,2,3\n"));
+    parser = Parser::new(Scanner::new("-", "1,2,3\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
       Ok(vec![Literal::Numeric(1), Literal::Numeric(2), Literal::Numeric(3)]));
 
     // A literal can contain multiple items of the different types.
-    parser = Parser::new(Scanner::new("1,\"Hello\",3\n"));
+    parser = Parser::new(Scanner::new("-", "1,\"Hello\",3\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
       Ok(vec![Literal::Numeric(1), Literal::String("Hello"), Literal::Numeric(3)]));
   }
@@ -429,17 +429,17 @@ mod tests {
   #[test]
   fn test_parse_directive() {
     // Test an origin directive.
-    let mut org_parser = Parser::new(Scanner::new(".org $100\n"));
+    let mut org_parser = Parser::new(Scanner::new("-", ".org $100\n"));
     let expected_org = Node::Directive { identifier: "org", arguments: vec![Literal::Numeric(0x100)] };
     assert_eq!(org_parser.parse_directive(), Ok(expected_org));
 
     // Test a db directive.
-    let mut db_parser = Parser::new(Scanner::new(".db \"Hello, World!\", $0\n"));
+    let mut db_parser = Parser::new(Scanner::new("-", ".db \"Hello, World!\", $0\n"));
     let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)] };
     assert_eq!(db_parser.parse_directive(), Ok(expected_db));
 
     // Test a fictional argument-free directive.
-    let mut test_parser = Parser::new(Scanner::new(".test\n"));
+    let mut test_parser = Parser::new(Scanner::new("-", ".test\n"));
     let expected_test = Node::Directive { identifier: "test", arguments: vec![] };
     assert_eq!(test_parser.parse_directive(), Ok(expected_test));
   }
@@ -447,7 +447,7 @@ mod tests {
   #[test]
   fn test_parse_label() {
     // Parse a label.
-    let mut parser = Parser::new(Scanner::new("a:\n"));
+    let mut parser = Parser::new(Scanner::new("-", "a:\n"));
     let expected_label = Node::Label { identifier: "a" }; 
     assert_eq!(parser.parse_label(), Ok(expected_label));
   }
@@ -455,48 +455,48 @@ mod tests {
   #[test]
   fn test_parse_field_list() {
     // A field list expects to be terminated by a newline.
-    let mut parser = Parser::new(Scanner::new(""));
+    let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_field_list(Vec::new()), 
       Err("Unexpected end-of-file reached. Expecting Instruction Field.".to_string()));
 
     // A field list cannot contain a comma alone.
-    parser = Parser::new(Scanner::new(",\n"));
+    parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
       Err("Unexpected token found (Comma(SourceFileLocation { location: 0, length: 1 })), expecting Instruction Field.".to_string()));
 
     // A field list cannot contain a string literal.
-    parser = Parser::new(Scanner::new("\"Hello\"\n"));
+    parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
       Err("Unexpected token found (StringLiteral(\"Hello\", SourceFileLocation { location: 0, length: 7 })), expecting Instruction Field.".to_string()));
 
     // An empty field list is valid.
-    parser = Parser::new(Scanner::new("\n"));
+    parser = Parser::new(Scanner::new("-", "\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![]));
 
     // A field list can contain a single item.
-    parser = Parser::new(Scanner::new("$00\n"));
+    parser = Parser::new(Scanner::new("-", "$00\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(0)]));
-    parser = Parser::new(Scanner::new("v1\n"));
+    parser = Parser::new(Scanner::new("-", "v1\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::GeneralPurposeRegister(1)]));
-    parser = Parser::new(Scanner::new("dt\n"));
+    parser = Parser::new(Scanner::new("-", "dt\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::DelayTimer]));
-    parser = Parser::new(Scanner::new("st\n"));
+    parser = Parser::new(Scanner::new("-", "st\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::SoundTimer]));
-    parser = Parser::new(Scanner::new("k\n"));
+    parser = Parser::new(Scanner::new("-", "k\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::KeypadRegister]));
-    parser = Parser::new(Scanner::new("i\n"));
+    parser = Parser::new(Scanner::new("-", "i\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegister]));
-    parser = Parser::new(Scanner::new("[i]\n"));
+    parser = Parser::new(Scanner::new("-", "[i]\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegisterIndirect]));
-    parser = Parser::new(Scanner::new("LABEL\n"));
+    parser = Parser::new(Scanner::new("-", "LABEL\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Identifier("LABEL")]));
 
     // A field list can end in a trailing comma.
-    parser = Parser::new(Scanner::new("$FF,\n"));
+    parser = Parser::new(Scanner::new("-", "$FF,\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(255)]));
 
     // A field list can contain multiple items of the same type.
-    parser = Parser::new(Scanner::new("v0,vf\n"));
+    parser = Parser::new(Scanner::new("-", "v0,vf\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
       Ok(vec![
         InstructionField::GeneralPurposeRegister(0), 
@@ -505,7 +505,7 @@ mod tests {
     );
 
     // A field list can contain multiple items of the different types.
-    parser = Parser::new(Scanner::new("v1,v2,$ff\n"));
+    parser = Parser::new(Scanner::new("-", "v1,v2,$ff\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
       Ok(vec![
         InstructionField::GeneralPurposeRegister(1),
@@ -518,17 +518,17 @@ mod tests {
   #[test]
   fn test_parse_instruction() {
     // Test an instruction with no fields.
-    let mut parser = Parser::new(Scanner::new("nop\n"));
+    let mut parser = Parser::new(Scanner::new("-", "nop\n"));
     let mut expected_instruction = Node::Instruction { mnemonic: "nop", fields: vec![] };
     assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
 
     // Test an instruction with one address target.
-    parser = Parser::new(Scanner::new("jp $002\n"));
+    parser = Parser::new(Scanner::new("-", "jp $002\n"));
     expected_instruction = Node::Instruction { mnemonic: "jp", fields: vec![ InstructionField::NumericLiteral(2) ]};
     assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
 
     // Test an instruction with a heterogenous field list.
-    parser = Parser::new(Scanner::new("drw v1, v2, $fe\n"));
+    parser = Parser::new(Scanner::new("-", "drw v1, v2, $fe\n"));
     expected_instruction = Node::Instruction { 
       mnemonic: "drw", 
       fields: vec![

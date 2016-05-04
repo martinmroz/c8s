@@ -307,9 +307,35 @@ impl<'a> Scanner<'a> {
    @return The source file location corresponding to the region advanced over.
    */
   fn advance_by(&mut self, bytes: usize) -> SourceFileLocation<'a> {
-    // TODO: Bytes do not line up with characters.
-    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, bytes);
-    self.position += bytes;
+    let mut total_byte_counter: usize = 0;
+    let mut total_char_counter: usize = 0;
+    let mut number_of_newlines: usize = 0;
+    let mut character_offset_on_final_line: usize = self.current_line_offset;
+
+    for c in self.input[self.position .. ].chars() {
+      total_char_counter += 1;
+      total_byte_counter += c.len_utf8();
+
+      // Track the line and character number over the processed range.
+      if c != '\n' {
+        character_offset_on_final_line += 1;
+      } else {
+        number_of_newlines += 1;
+        character_offset_on_final_line = 1;
+      }
+
+      // Stop processing if the end of the range is found.
+      if total_byte_counter == bytes {
+        break;
+      } else if total_byte_counter > bytes {
+        assert!(false, "Byte length of range doesn't line up with code points.");
+      }
+    }
+
+    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, total_char_counter);
+    self.current_line += number_of_newlines;
+    self.current_line_offset = character_offset_on_final_line;
+    self.position += total_byte_counter;
     location
   }
 
@@ -388,20 +414,20 @@ mod tests {
   
   #[test]
   fn test_is_at_end_empty_string() {
-    let mut scanner = Scanner::new("");
+    let mut scanner = Scanner::new("-", "");
     assert_eq!(scanner.is_at_end(), true);
     assert_eq!(scanner.next(), None);
   }
   
   #[test]
   fn test_is_at_end_non_empty_string() {
-    let scanner = Scanner::new("NON_EMPTY_STRING");
+    let scanner = Scanner::new("-", "NON_EMPTY_STRING");
     assert_eq!(scanner.is_at_end(), false);
   }
   
   #[test]
   fn test_next_whitespace_only() {
-    let mut scanner = Scanner::new("    \t");
+    let mut scanner = Scanner::new("-", "    \t");
     assert_eq!(scanner.is_at_end(), false);
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
@@ -411,25 +437,25 @@ mod tests {
   
   #[test]
   fn test_directive_marker() {
-    let mut scanner = Scanner::new(".");
+    let mut scanner = Scanner::new("-", ".");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::DirectiveMarker(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::DirectiveMarker(SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
   #[test]
   fn test_label_marker() {
-    let mut scanner = Scanner::new(":");
+    let mut scanner = Scanner::new("-", ":");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::LabelMarker(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::LabelMarker(SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
   #[test]
   fn test_comma() {
-    let mut scanner = Scanner::new(",");
+    let mut scanner = Scanner::new("-", ",");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Comma(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::Comma(SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
@@ -437,49 +463,49 @@ mod tests {
   
   #[test]
   fn test_newline_ignores_windows_terminators() {
-    let mut scanner = Scanner::new("\n\r\n\n \n");
+    let mut scanner = Scanner::new("-", "\n\r\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(2,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 2, 2, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(3,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 3, 1, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(5,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 4, 2, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
 
   #[test]
   fn test_newline() {
-    let mut scanner = Scanner::new("\n\n \n");
+    let mut scanner = Scanner::new("-", "\n\n \n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 2, 1, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(3,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 3, 2, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
 
   #[test]
   fn test_comment() {
-    let mut scanner = Scanner::new(";");
+    let mut scanner = Scanner::new("-", ";");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), true);
     
-    scanner = Scanner::new(";\n");
+    scanner = Scanner::new("-", ";\n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new(0,1))));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment(";", SourceFileLocation::new("-", 1, 1, 1))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(1,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 1, 2, 1))));
     assert_eq!(scanner.is_at_end(), true);
     
-    scanner = Scanner::new("; Single-Line Comment\n");
+    scanner = Scanner::new("-", "; Single-Line Comment\n");
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment", SourceFileLocation::new(0,21))));
+    assert_eq!(scanner.next(), Some(Token::SingleLineComment("; Single-Line Comment", SourceFileLocation::new("-", 1, 1, 21))));
     assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new(21,1))));
+    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 1, 22, 1))));
     assert_eq!(scanner.is_at_end(), true);
   }
   
@@ -487,79 +513,79 @@ mod tests {
   
   #[test]
   fn test_identifier() {
-    let mut scanner = Scanner::new("_ _a a _A A _0 _aA _zZ9");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_a", SourceFileLocation::new(2,2))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("a", SourceFileLocation::new(5,1))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_A", SourceFileLocation::new(7,2))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("A", SourceFileLocation::new(10,1))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(12,2))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_aA", SourceFileLocation::new(15,3))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_zZ9", SourceFileLocation::new(19,4))));
+    let mut scanner = Scanner::new("-", "_ _a a _A A _0 _aA _zZ9");
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new("-", 1, 1, 1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_a", SourceFileLocation::new("-", 1, 3, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("a", SourceFileLocation::new("-", 1, 6, 1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_A", SourceFileLocation::new("-", 1, 8, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("A", SourceFileLocation::new("-", 1, 11, 1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 13, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_aA", SourceFileLocation::new("-", 1, 16, 3))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_zZ9", SourceFileLocation::new("-", 1, 20, 4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
-    scanner = Scanner::new("_&");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string(), SourceFileLocation::new(1,1))));
+    scanner = Scanner::new("-", "_&");
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new("-", 1, 1, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid character '&'".to_string(), SourceFileLocation::new("-", 1, 2, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
-    scanner = Scanner::new("_$0");
-    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(1,2))));
+    scanner = Scanner::new("-", "_$0");
+    assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new("-", 1, 1, 1))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new("-", 1, 2, 2))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
 
   #[test]
   fn test_index_register_indirect() {
-    let mut scanner = Scanner::new("[i] [a]");
-    assert_eq!(scanner.next(), Some(Token::Identifier("[i]", SourceFileLocation::new(0,3))));
-    assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string(), SourceFileLocation::new(4,1))));
+    let mut scanner = Scanner::new("-", "[i] [a]");
+    assert_eq!(scanner.next(), Some(Token::Identifier("[i]", SourceFileLocation::new("-", 1, 1, 3))));
+    assert_eq!(scanner.next(), Some(Token::Error("Expected Index Register Indirect ([i]) not found.".to_string(), SourceFileLocation::new("-", 1, 5, 1))));
   }
   
   #[test]
   fn test_numeric_literal_hex() {
-    let mut scanner = Scanner::new("$0 $00 $000 $1 $F $FF $1FF $1_0 $");
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new(0,2))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new(3,3))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new(7,4))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new(12,2))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF, SourceFileLocation::new(15,2))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF, SourceFileLocation::new(18,3))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new(22,4))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new(27,2))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(29,2))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), SourceFileLocation::new(32,1))));
+    let mut scanner = Scanner::new("-", "$0 $00 $000 $1 $F $FF $1FF $1_0 $");
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new("-", 1, 1, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new("-", 1, 4, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new("-", 1, 8, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 13, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF, SourceFileLocation::new("-", 1, 16, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF, SourceFileLocation::new("-", 1, 19, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new("-", 1, 23, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 28, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 30, 2))));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid hexadecimal literal starting with ($).".to_string(), SourceFileLocation::new("-", 1, 33, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
   
   #[test]
   fn test_numeric_literal_dec() {
-    let mut scanner = Scanner::new("0 00 000 1 15 255 4095 1_0 4096");
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(0,1))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(2,2))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new(5,3))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new(9,1))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(15, SourceFileLocation::new(11,2))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(255, SourceFileLocation::new(14,3))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new(18,4))));
-    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new(23,1))));
-    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new(24,2))));
-    assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."), SourceFileLocation::new(27,4))));
+    let mut scanner = Scanner::new("-", "0 00 000 1 15 255 4095 1_0 4096");
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new("-", 1, 1, 1))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new("-", 1, 3, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0, SourceFileLocation::new("-", 1, 6, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new("-", 1, 10, 1))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(15, SourceFileLocation::new("-", 1, 12, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(255, SourceFileLocation::new("-", 1, 15, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new("-", 1, 19, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new("-", 1, 24, 1))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 25, 2))));
+    assert_eq!(scanner.next(), Some(Token::Error(format!("Decimal literal 4096 out of range (0...4095)."), SourceFileLocation::new("-", 1, 28, 4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
   
   #[test]
   fn test_string_literal() {
-    let mut scanner = Scanner::new("\"\" \"a\" \"123\" \"end-of-line");
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new(0,2))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new(3,3))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new(7,5))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string(), SourceFileLocation::new(13,1))));
+    let mut scanner = Scanner::new("-", "\"\" \"a\" \"123\" \"end-of-line");
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new("-", 1, 1, 2))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new("-", 1, 4, 3))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new("-", 1, 8, 5))));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string(), SourceFileLocation::new("-", 1, 14, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
