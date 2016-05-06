@@ -307,35 +307,27 @@ impl<'a> Scanner<'a> {
    @return The source file location corresponding to the region advanced over.
    */
   fn advance_by(&mut self, bytes: usize) -> SourceFileLocation<'a> {
-    let mut total_byte_counter: usize = 0;
-    let mut total_char_counter: usize = 0;
-    let mut number_of_newlines: usize = 0;
-    let mut character_offset_on_final_line: usize = self.current_line_offset;
+    let range = &self.input[self.position .. (self.position + bytes)];
 
-    for c in self.input[self.position .. ].chars() {
-      total_char_counter += 1;
-      total_byte_counter += c.len_utf8();
+    // Count the number of code points in the byte range and sanity-check.
+    let total_char_count = range.chars().count();
+    let total_byte_count = range.chars().fold(0, |acc, x| acc + x.len_utf8());
+    assert!(total_byte_count == bytes, "Byte length of range doesn't line up with code points.");
 
-      // Track the line and character number over the processed range.
-      if c != '\n' {
-        character_offset_on_final_line += 1;
-      } else {
-        number_of_newlines += 1;
-        character_offset_on_final_line = 1;
+    // Count the number of newlines in the in the character range.
+    let number_of_newlines = range.chars().fold(0, |acc, x|
+      match x {
+        '\n' => acc + 1,
+           _ => acc
       }
+    );
 
-      // Stop processing if the end of the range is found.
-      if total_byte_counter == bytes {
-        break;
-      } else if total_byte_counter > bytes {
-        assert!(false, "Byte length of range doesn't line up with code points.");
-      }
-    }
+    let mut character_offset_on_final_line: usize = self.current_line_offset + total_char_count;
 
-    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, total_char_counter);
+    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, total_char_count);
     self.current_line += number_of_newlines;
     self.current_line_offset = character_offset_on_final_line;
-    self.position += total_byte_counter;
+    self.position += total_byte_count;
     location
   }
 
