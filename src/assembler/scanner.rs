@@ -590,5 +590,13 @@ mod tests {
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
+
+  #[test]
+  fn test_string_literal_multiline() {
+    let mut scanner = Scanner::new("-", "\"Hello 😊\n🐳 World\"");
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("Hello 😊\n🐳 World", SourceFileLocation::new("-", 2, 1, 7))));
+    assert_eq!(scanner.next(), None);
+    assert_eq!(scanner.is_at_end(), true);
+  }
   
 }
