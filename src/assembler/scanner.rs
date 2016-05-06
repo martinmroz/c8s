@@ -581,11 +581,12 @@ mod tests {
   
   #[test]
   fn test_string_literal() {
-    let mut scanner = Scanner::new("-", "\"\" \"a\" \"123\" \"end-of-line");
+    let mut scanner = Scanner::new("-", "\"\" \"a\" \"😊😞\" \"123\" \"end-of-line");
     assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new("-", 1, 1, 2))));
     assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new("-", 1, 4, 3))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new("-", 1, 8, 5))));
-    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string(), SourceFileLocation::new("-", 1, 14, 1))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("😊😞", SourceFileLocation::new("-", 1, 8, 4))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new("-", 1, 13, 5))));
+    assert_eq!(scanner.next(), Some(Token::Error("Invalid quoted string literal.".to_string(), SourceFileLocation::new("-", 1, 19, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
