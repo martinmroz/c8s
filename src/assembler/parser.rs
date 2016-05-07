@@ -6,9 +6,9 @@ use assembler::token::Token;
 // MARK: - Abstract Syntax List
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal<'a> {
+pub enum Literal {
     /// A literal string value.
-    String(&'a str),
+    String(String),
     /// A literal numeric value.
     Numeric(usize)
 }
@@ -35,7 +35,7 @@ pub enum InstructionField<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Node<'a> {
-    Directive   { identifier: &'a str, arguments: Vec<Literal<'a>> },
+    Directive   { identifier: &'a str, arguments: Vec<Literal> },
     Label       { identifier: &'a str },
     Instruction {   mnemonic: &'a str,    fields: Vec<InstructionField<'a>> }
 }
@@ -133,7 +133,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     if let Token::Identifier(identifier,_) = expect_and_consume!(self, Some(Token::Identifier(_,_))) {
       Ok(identifier)
     } else {
-      Err(format!("Internal parser error, failure of expect_and_consume! macro."))
+      unreachable!()
     }
   }
 
@@ -142,8 +142,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    literal ::= STRING | NUMERIC.
    @return The literal if successful, or an error.
    */
-  fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
-    match self.current_token {
+  fn parse_literal(&mut self) -> Result<Literal, String> {
+    match self.current_token.clone() {
 
       // Match and consume a string literal token.
       Some(Token::StringLiteral(string, _)) => {
@@ -166,10 +166,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   /**
    Parses and consumes a comma-separated list of zero-or-more string or numeric literals.
    literal_list ::= literal | literal "," literal_list | .
-   @param list Provide an empty Vec<Literal<'a>>.
+   @param list Provide an empty Vec<Literal>.
    @return A list of literals if successful, or an error.
    */
-  fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
+  fn parse_literal_list(&mut self, list: Vec<Literal>) -> Result<Vec<Literal>, String> {
     
     // The literal list is complete.
     if let Some(Token::Newline(_)) = self.current_token {
@@ -202,7 +202,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     let identifier = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
 
-    Ok(Node::Directive { identifier: identifier, arguments: parameters})
+    Ok(Node::Directive { identifier: identifier, arguments: parameters })
   }
 
   /**
@@ -215,7 +215,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     expect_and_consume!(self, Some(Token::LabelMarker(_)));
 
-    Ok(Node::Label {identifier: identifier})
+    Ok(Node::Label { identifier: identifier })
   }
 
   /**
@@ -259,7 +259,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
             // If the identifier matches ("v"[0-9a-fA-F]), it's a GPR.
             let id_length = identifier_string.chars().count();
-            if (id_length == 2) && (identifier_string.chars().next().unwrap() == 'v') {
+            if (id_length == 2) && identifier_string.starts_with("v") {
               let numeric_portion = &identifier_string['v'.len_utf8() .. ];
               if let Some(value) = u8::from_str_radix(numeric_portion, 16).ok() {
                 field = InstructionField::GeneralPurposeRegister(value);
@@ -409,7 +409,7 @@ mod tests {
     parser = Parser::new(Scanner::new("-", "1\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::Numeric(1)]));
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
-    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String("Hello")]));
+    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String(String::from("Hello"))]));
 
     // A literal list can end in a trailing comma.
     parser = Parser::new(Scanner::new("-", "1,\n"));
@@ -423,7 +423,7 @@ mod tests {
     // A literal can contain multiple items of the different types.
     parser = Parser::new(Scanner::new("-", "1,\"Hello\",3\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Ok(vec![Literal::Numeric(1), Literal::String("Hello"), Literal::Numeric(3)]));
+      Ok(vec![Literal::Numeric(1), Literal::String(String::from("Hello")), Literal::Numeric(3)]));
   }
 
   #[test]
@@ -435,7 +435,7 @@ mod tests {
 
     // Test a db directive.
     let mut db_parser = Parser::new(Scanner::new("-", ".db \"Hello, World!\", $0\n"));
-    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)] };
+    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String(String::from("Hello, World!")), Literal::Numeric(0)] };
     assert_eq!(db_parser.parse_directive(), Ok(expected_db));
 
     // Test a fictional argument-free directive.
