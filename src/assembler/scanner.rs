@@ -3,42 +3,7 @@ use regex::Regex;
 
 use std::fmt;
 
-#[derive(PartialEq, Eq, Debug, Clone)]
-pub struct SourceFileLocation<'a> {
-  /// The display name of the source file (usually last path component).
-  file_name: &'a str,
-  /// The line number corresponding to the range.
-  line: usize,
-  /// The offset from the start of input, in bytes, starting at 1.
-  location: usize,
-  /// The length of the region, in bytes.
-  length: usize
-}
-
-impl<'a> fmt::Display for SourceFileLocation<'a> {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}:{}:{}-{}", self.file_name, self.line, self.location, self.location + self.length)
-  }
-}
-
-impl<'a> SourceFileLocation<'a> {
-  /**
-   Creates a new source file location.
-   @param file_name The display name of the source file (usually last path component).
-   @param line The line number within the source file, starting at 1. Asserts if 0.
-   @param location The offset from the start of the input, in code points, starting at 1. Asserts if 0.
-   @param length The number of code points corresponding to the location. Asserts if 0.
-   */
-  fn new(file_name: &'a str, line: usize, location: usize, length: usize) -> SourceFileLocation<'a> {
-    assert!(location > 0 && length > 0);
-    SourceFileLocation {
-      file_name: file_name,
-      line: line,
-      location: location,
-      length: length
-    }
-  }
-}
+use assembler::source_file_location::SourceFileLocation;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Token<'a> {
@@ -322,9 +287,7 @@ impl<'a> Scanner<'a> {
       last_line_offset += 1;
 
       // Count characters on first line up to and including the terminator.
-      if number_of_newlines == 0 {
-        characters_on_first_line += 1;
-      }
+      if number_of_newlines == 0 { characters_on_first_line += 1; }
 
       // On newline, bump the newline counter and reset the last-line offset.
       if character == '\n' {
@@ -413,6 +376,8 @@ impl<'a> Iterator for Scanner<'a> {
 mod tests {
   
   use super::*;
+
+  use assembler::source_file_location::SourceFileLocation;
   
   #[test]
   fn test_is_at_end_empty_string() {
