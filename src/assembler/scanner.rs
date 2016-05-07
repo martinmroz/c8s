@@ -186,11 +186,11 @@ impl<'a> Scanner<'a> {
    @return A token containing the identifier, or Error in case of invalid formatting.
    */
   fn consume_index_register_indirect(&mut self) -> Token<'a> {
-    let mut char_iter = self.input[self.position .. ].chars();
+    let index_register_indirect = "[i]";
 
     // The Index Register Indirect identifier, [i] is consumed as an identifier.
-    if let (Some('['), Some('i'), Some(']')) = (char_iter.next(), char_iter.next(), char_iter.next()) {
-      let length = "[i]".len();
+    if self.input[self.position .. ].starts_with(index_register_indirect) {
+      let length = index_register_indirect.len();
       let slice = &self.input[self.position .. self.position + length];
       let location = self.advance_by(length);
       return Token::Identifier(slice, location);
