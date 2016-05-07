@@ -303,31 +303,41 @@ impl<'a> Scanner<'a> {
   }
   
   /**
-   Advances the position counter by the specified number of bytes.
+   Advances the position counter, line and line offset based on the next n bytes.
    @return The source file location corresponding to the region advanced over.
    */
   fn advance_by(&mut self, bytes: usize) -> SourceFileLocation<'a> {
     let range = &self.input[self.position .. (self.position + bytes)];
 
     // Count the number of code points in the byte range and sanity-check.
-    let total_char_count = range.chars().count();
     let total_byte_count = range.chars().fold(0, |acc, x| acc + x.len_utf8());
     assert!(total_byte_count == bytes, "Byte length of range doesn't line up with code points.");
 
-    // Count the number of newlines in the in the character range.
-    let number_of_newlines = range.chars().fold(0, |acc, x|
-      match x {
-        '\n' => acc + 1,
-           _ => acc
+    // Track the number of newlines, characters on the first line and build the new last-line offset.
+    let mut number_of_newlines = 0;
+    let mut characters_on_first_line = 0;
+    let mut last_line_offset = self.current_line_offset;
+
+    for character in range.chars() {
+      last_line_offset += 1;
+
+      // Count characters on first line up to and including the terminator.
+      if number_of_newlines == 0 {
+        characters_on_first_line += 1;
       }
-    );
 
-    let mut character_offset_on_final_line: usize = self.current_line_offset + total_char_count;
+      // On newline, bump the newline counter and reset the last-line offset.
+      if character == '\n' {
+        number_of_newlines += 1;
+        last_line_offset = 1;
+      }
+    }
 
-    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, total_char_count);
+    // The resultant location spans all characters up to and including any null-terminator on the first line in the range.
+    let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, characters_on_first_line);
+    self.position += bytes;
     self.current_line += number_of_newlines;
-    self.current_line_offset = character_offset_on_final_line;
-    self.position += total_byte_count;
+    self.current_line_offset = last_line_offset;
     location
   }
 
@@ -586,7 +596,7 @@ mod tests {
   #[test]
   fn test_string_literal_multiline() {
     let mut scanner = Scanner::new("-", "\"Hello 😊\n🐳 World\"");
-    assert_eq!(scanner.next(), Some(Token::StringLiteral("Hello 😊\n🐳 World", SourceFileLocation::new("-", 2, 1, 7))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("Hello 😊\n🐳 World", SourceFileLocation::new("-", 1, 1, 9))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
