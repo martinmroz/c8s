@@ -1,31 +1,8 @@
 
 use regex::Regex;
 
-use std::fmt;
-
 use assembler::source_file_location::SourceFileLocation;
-
-#[derive(PartialEq, Debug, Clone)]
-pub enum Token<'a> {
-  /// A single-line comment. Value includes ';' but not the newline.
-  SingleLineComment(&'a str, SourceFileLocation<'a>),
-  /// A period.
-  DirectiveMarker(SourceFileLocation<'a>),
-  /// An identifier (starts with an _ or a letter, is an underscore or alphanumeric).
-  Identifier(&'a str, SourceFileLocation<'a>),
-  /// A colon.
-  LabelMarker(SourceFileLocation<'a>),
-  /// A string literal, contained in double-quotes. Quotes are not included in the value.
-  StringLiteral(&'a str, SourceFileLocation<'a>),
-  /// A numeric literal value.
-  NumericLiteral(usize, SourceFileLocation<'a>),
-  /// List separator token ','.
-  Comma(SourceFileLocation<'a>),
-  /// Newline, a \n character.
-  Newline(SourceFileLocation<'a>),
-  /// An including the reason that the tokenization failed.
-  Error(String, SourceFileLocation<'a>)
-}
+use assembler::token::Token;
 
 pub struct Scanner<'a> {
   /// The display name of the source file (usually last path component).
@@ -377,8 +354,9 @@ mod tests {
   
   use super::*;
 
+  use assembler::token::Token;
   use assembler::source_file_location::SourceFileLocation;
-  
+
   #[test]
   fn test_is_at_end_empty_string() {
     let mut scanner = Scanner::new("-", "");

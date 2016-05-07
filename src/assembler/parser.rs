@@ -1,7 +1,7 @@
 
 use std::mem;
 
-use assembler::scanner::Token;
+use assembler::token::Token;
 
 // MARK: - Abstract Syntax List
 
