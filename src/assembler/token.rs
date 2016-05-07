@@ -47,7 +47,7 @@ impl<'a> Token<'a> {
 impl<'a> fmt::Display for Token<'a> {
   /**
    Formats the receiver for display purposes. This includes the associated value if any
-   while omitting the source file location component.
+   while omitting the source file location component. Names are lower-case.
    @param f Formatter to write into.
    @return A result representing the formatted receiver or a failure to write into the Formatter.
    */
@@ -58,10 +58,33 @@ impl<'a> fmt::Display for Token<'a> {
       Token::Identifier(ref value, _)       => write!(f, "identifier ({})", value),
       Token::LabelMarker(_)                 => write!(f, "label marker"),
       Token::StringLiteral(ref value, _)    => write!(f, "string literal (\"{}\")", value),
-      Token::NumericLiteral(ref value, _)   => write!(f, "numeric literal (\"{}\")", value),
+      Token::NumericLiteral(ref value, _)   => write!(f, "numeric literal ({})", value),
       Token::Comma(_)                       => write!(f, "comma"),
       Token::Newline(_)                     => write!(f, "newline"),
       Token::Error(ref reason, _)           => write!(f, "{}", reason)
     }
   }
+}
+
+#[cfg(test)]
+mod tests {
+  
+  use super::*;
+
+  use assembler::source_file_location::SourceFileLocation;
+
+  #[test]
+  fn test_display_fmt() {
+    let location = SourceFileLocation::new("test_file.s", 1, 1, 1);
+    assert_eq!(format!("{}", Token::SingleLineComment("; Hello", location.clone())), "single-line comment");
+    assert_eq!(format!("{}", Token::DirectiveMarker(location.clone())), "directive marker");
+    assert_eq!(format!("{}", Token::Identifier("test_id", location.clone())), "identifier (test_id)");
+    assert_eq!(format!("{}", Token::LabelMarker(location.clone())), "label marker");
+    assert_eq!(format!("{}", Token::StringLiteral("Hello", location.clone())), "string literal (\"Hello\")");
+    assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12)");
+    assert_eq!(format!("{}", Token::Comma(location.clone())), "comma");
+    assert_eq!(format!("{}", Token::Newline(location.clone())), "newline");
+    assert_eq!(format!("{}", Token::Error("error_reason".to_string(), location.clone())), "error_reason");
+  }
+
 }
