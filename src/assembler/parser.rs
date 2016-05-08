@@ -118,9 +118,9 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    */
   fn syntax_error_for_unexpected_token(&self, expecting: &str) -> String {
     if let Some(ref token) = self.current_token {
-      format!("{}: Unexpected token found: {}, expecting {}.", token.location(), token, expecting)
+      format!("{}: error: Unexpected token found: {}, expecting {}.", token.location(), token, expecting)
     } else {
-      format!("Unexpected end-of-file reached, expecting {}.", expecting)
+      format!("error: Unexpected end-of-file reached, expecting {}.", expecting)
     }
   }
 
@@ -398,12 +398,12 @@ mod tests {
     // A literal list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err("Unexpected end-of-file reached, expecting numeric literal or string literal.".to_string()));
+      Err("error: Unexpected end-of-file reached, expecting numeric literal or string literal.".to_string()));
 
     // A literal list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err(format!("-:1:1: Unexpected token found: comma, expecting numeric literal or string literal.")));
+      Err(format!("-:1:1: error: Unexpected token found: comma, expecting numeric literal or string literal.")));
 
     // An empty literal list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
@@ -461,17 +461,17 @@ mod tests {
     // A field list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected end-of-file reached, expecting instruction field.".to_string()));
+      Err("error: Unexpected end-of-file reached, expecting instruction field.".to_string()));
 
     // A field list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1: Unexpected token found: comma, expecting instruction field.")));
+      Err(format!("-:1:1: error: Unexpected token found: comma, expecting instruction field.")));
 
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1-7: Unexpected token found: string literal (\"Hello\"), expecting instruction field.")));
+      Err(format!("-:1:1-7: error: Unexpected token found: string literal (\"Hello\"), expecting instruction field.")));
 
     // An empty field list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
