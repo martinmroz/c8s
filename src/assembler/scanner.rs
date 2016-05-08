@@ -116,8 +116,7 @@ impl<'a> Scanner<'a> {
           }
           _ => {
             // Push to the end of the input to indicate parse failure.
-            // TODO: Length does not correspond between bytes and characters.
-            let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, byte_index_end);
+            let location = self.advance_by(byte_index_end);
             self.position = self.input.len();
             Token::Error(format!("Decimal literal {} out of range (0...4095).", slice), location)
           }
