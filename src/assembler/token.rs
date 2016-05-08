@@ -45,6 +45,20 @@ impl<'a> Token<'a> {
   }
 }
 
+/**
+ Un-parameterized display names for tokens.
+ */
+pub mod display_names {
+  pub const SINGLE_LINE_COMMENT: &'static str = "single-line comment";
+  pub const DIRECTIVE_MARKER: &'static str = "directive marker";
+  pub const IDENTIFIER: &'static str = "identifier";
+  pub const LABEL_MARKER: &'static str = "label marker";
+  pub const STRING_LITERAL: &'static str = "string literal";
+  pub const NUMERIC_LITERAL: &'static str = "numeric literal";
+  pub const COMMA: &'static str = "comma";
+  pub const NEWLINE: &'static str = "newline";
+}
+
 impl<'a> fmt::Display for Token<'a> {
   /**
    Formats the receiver for display purposes. This includes the associated value if any
@@ -54,14 +68,14 @@ impl<'a> fmt::Display for Token<'a> {
    */
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match *self {
-      Token::SingleLineComment(_, _)        => write!(f, "single-line comment"),
-      Token::DirectiveMarker(_)             => write!(f, "directive marker"),
-      Token::Identifier(ref value, _)       => write!(f, "identifier ({})", value),
-      Token::LabelMarker(_)                 => write!(f, "label marker"),
-      Token::StringLiteral(ref value, _)    => write!(f, "string literal (\"{}\")", value),
-      Token::NumericLiteral(ref value, _)   => write!(f, "numeric literal ({} / ${:X})", value, value),
-      Token::Comma(_)                       => write!(f, "comma"),
-      Token::Newline(_)                     => write!(f, "newline"),
+      Token::SingleLineComment(_, _)        => write!(f, "{}", display_names::SINGLE_LINE_COMMENT),
+      Token::DirectiveMarker(_)             => write!(f, "{}", display_names::DIRECTIVE_MARKER),
+      Token::LabelMarker(_)                 => write!(f, "{}", display_names::LABEL_MARKER),
+      Token::Comma(_)                       => write!(f, "{}", display_names::COMMA),
+      Token::Newline(_)                     => write!(f, "{}", display_names::NEWLINE),
+      Token::Identifier(ref value, _)       => write!(f, "{} ({})", display_names::IDENTIFIER, value),
+      Token::StringLiteral(ref value, _)    => write!(f, "{} (\"{}\")", display_names::STRING_LITERAL, value),
+      Token::NumericLiteral(ref value, _)   => write!(f, "{} ({} / ${:X})", display_names::NUMERIC_LITERAL, value, value),
       Token::Error(ref reason, _)           => write!(f, "{}", reason)
     }
   }
