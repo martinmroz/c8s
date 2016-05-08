@@ -52,8 +52,6 @@ impl<'a> Scanner<'a> {
     match STRING_LITERAL.find(&self.input[self.position .. ]) {
       Some((_, byte_index_end)) => {
         // Remove the leading and trailing quotation marks from the string literal.
-        // TODO: Un-escape the parsed string literal.
-        // TODO: Do not match un-terminated string literals.
         let slice_start = self.position + '"'.len_utf8();
         let slice_end = self.position + byte_index_end - '"'.len_utf8();
         let slice = &self.input[slice_start .. slice_end];
