@@ -2,6 +2,7 @@
 use std::mem;
 
 use assembler::token::Token;
+use assembler::token::display_names;
 use assembler::u12::*;
 
 // MARK: - Abstract Syntax List
@@ -60,13 +61,13 @@ struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
  @return The consumed token.
  */
 macro_rules! expect_and_consume {
-  ($parser:expr, $pattern:pat) => {{
+  ($parser:expr, $pattern:pat, $name:expr) => {{
     match $parser.current_token {
       $pattern => {
         $parser.consume_token().unwrap()
       }
       _ => { 
-        return Err($parser.syntax_error_for_unexpected_token(stringify!($pattern))); 
+        return Err($parser.syntax_error_for_unexpected_token($name));
       }
     }
   }}
@@ -115,7 +116,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      a certain token, and either a different one was found or the end of the
      token stream was reached prematurely.
    */
-  fn syntax_error_for_unexpected_token(&self, expecting: &'static str) -> String {
+  fn syntax_error_for_unexpected_token(&self, expecting: &str) -> String {
     if let Some(ref token) = self.current_token {
       format!("{}: Unexpected token found: {}, expecting {}.", token.location(), token, expecting)
     } else {
@@ -131,7 +132,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return The string value of the identifier if successful, or an error.
    */
   fn parse_identifier(&mut self) -> Result<&'a str, String> {
-    if let Token::Identifier(identifier,_) = expect_and_consume!(self, Some(Token::Identifier(_,_))) {
+    if let Token::Identifier(identifier,_) = expect_and_consume!(self, Some(Token::Identifier(_,_)), display_names::IDENTIFIER) {
       Ok(identifier)
     } else {
       unreachable!()
@@ -159,7 +160,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       }
 
       _ => {
-        Err(self.syntax_error_for_unexpected_token("Numeric or String Literal"))
+        let expected = format!("{} or {}", display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL);
+        Err(self.syntax_error_for_unexpected_token(expected.as_str()))
       }
     }
   }
@@ -198,7 +200,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return A directive node if successful, or an error.
    */
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
-    expect_and_consume!(self, Some(Token::DirectiveMarker(_)));
+    expect_and_consume!(self, Some(Token::DirectiveMarker(_)), display_names::DIRECTIVE_MARKER);
 
     let identifier = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
@@ -214,7 +216,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_label(&mut self) -> Result<Node<'a>, String> {
     let identifier = try!(self.parse_identifier());
 
-    expect_and_consume!(self, Some(Token::LabelMarker(_)));
+    expect_and_consume!(self, Some(Token::LabelMarker(_)), display_names::LABEL_MARKER);
 
     Ok(Node::Label { identifier: identifier })
   }
@@ -278,7 +280,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // No field discovered.
       _ => {
-        return Err(self.syntax_error_for_unexpected_token("Instruction Field"))
+        return Err(self.syntax_error_for_unexpected_token("instruction field"))
       }
 
     };
@@ -396,12 +398,12 @@ mod tests {
     // A literal list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err("Unexpected end-of-file reached, expecting Numeric or String Literal.".to_string()));
+      Err("Unexpected end-of-file reached, expecting numeric literal or string literal.".to_string()));
 
     // A literal list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err(format!("-:1:1: Unexpected token found: comma, expecting Numeric or String Literal.")));
+      Err(format!("-:1:1: Unexpected token found: comma, expecting numeric literal or string literal.")));
 
     // An empty literal list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
@@ -459,17 +461,17 @@ mod tests {
     // A field list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("Unexpected end-of-file reached, expecting Instruction Field.".to_string()));
+      Err("Unexpected end-of-file reached, expecting instruction field.".to_string()));
 
     // A field list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1: Unexpected token found: comma, expecting Instruction Field.")));
+      Err(format!("-:1:1: Unexpected token found: comma, expecting instruction field.")));
 
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1-7: Unexpected token found: string literal (\"Hello\"), expecting Instruction Field.")));
+      Err(format!("-:1:1-7: Unexpected token found: string literal (\"Hello\"), expecting instruction field.")));
 
     // An empty field list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
