@@ -1,7 +1,7 @@
 
-use regex::Regex;
-
 use std::borrow::Cow;
+
+use regex::Regex;
 
 use assembler::source_file_location::SourceFileLocation;
 use assembler::token::Token;
@@ -353,10 +353,10 @@ mod tests {
   
   use std::borrow::Cow;
 
-  use super::*;
-
   use assembler::token::Token;
   use assembler::source_file_location::SourceFileLocation;
+
+  use super::*;
 
   #[test]
   fn test_is_at_end_empty_string() {

@@ -24,6 +24,13 @@ impl U12 {
         self.into()
     }
 
+    pub fn as_u8(self) -> Option<u8> {
+        match self.hi_4() {
+            0 => Some(self.lo_8()),
+            _ => None
+        }
+    }
+
     pub fn wrapping_add(self, other: U12) -> U12 {
         U12((self.0 + other.0) & 0xFFF)
     }

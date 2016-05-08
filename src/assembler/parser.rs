@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use std::mem;
 
 use assembler::token::Token;
+use assembler::u12::*;
 
 // MARK: - Abstract Syntax List
 
@@ -17,7 +18,7 @@ pub enum Literal<'a> {
 #[derive(Debug, PartialEq)]
 pub enum InstructionField<'a> {
     /// A numeric literal value.
-    NumericLiteral(usize),
+    NumericLiteral(U12),
     /// A general-purpose register beginning with "v".
     GeneralPurposeRegister(u8),
     /// The delay timer register ("dt").
@@ -238,7 +239,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // A numeric literal parameter was matched.
       Some(Token::NumericLiteral(number, _)) => {
-        let literal = InstructionField::NumericLiteral(number);
+        let literal = InstructionField::NumericLiteral(number.as_u12().unwrap());
         let _ = self.consume_token();
         literal
       }
@@ -387,10 +388,11 @@ mod tests {
   
   use std::borrow::Cow;
 
+  use assembler::scanner::Scanner;
+  use assembler::u12::*;
+
   use super::Parser;
   use super::{Literal, Node, InstructionField};
-
-  use assembler::scanner::Scanner;
 
   #[test]
   fn test_parse_literal_list() {
@@ -478,7 +480,7 @@ mod tests {
 
     // A field list can contain a single item.
     parser = Parser::new(Scanner::new("-", "$00\n"));
-    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(0)]));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(U12::zero())]));
     parser = Parser::new(Scanner::new("-", "v1\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::GeneralPurposeRegister(1)]));
     parser = Parser::new(Scanner::new("-", "dt\n"));
@@ -496,7 +498,7 @@ mod tests {
 
     // A field list can end in a trailing comma.
     parser = Parser::new(Scanner::new("-", "$FF,\n"));
-    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(255)]));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(U12::from(255))]));
 
     // A field list can contain multiple items of the same type.
     parser = Parser::new(Scanner::new("-", "v0,vf\n"));
@@ -513,7 +515,7 @@ mod tests {
       Ok(vec![
         InstructionField::GeneralPurposeRegister(1),
         InstructionField::GeneralPurposeRegister(2),
-        InstructionField::NumericLiteral(255)
+        InstructionField::NumericLiteral(U12::from(255))
       ])
     );
   }
@@ -527,7 +529,7 @@ mod tests {
 
     // Test an instruction with one address target.
     parser = Parser::new(Scanner::new("-", "jp $002\n"));
-    expected_instruction = Node::Instruction { mnemonic: "jp", fields: vec![ InstructionField::NumericLiteral(2) ]};
+    expected_instruction = Node::Instruction { mnemonic: "jp", fields: vec![ InstructionField::NumericLiteral(U12::from(2)) ]};
     assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
 
     // Test an instruction with a heterogenous field list.
@@ -537,7 +539,7 @@ mod tests {
       fields: vec![
         InstructionField::GeneralPurposeRegister(1),
         InstructionField::GeneralPurposeRegister(2),
-        InstructionField::NumericLiteral(254)
+        InstructionField::NumericLiteral(U12::from(254))
       ]
     };
     assert_eq!(parser.parse_instruction(), Ok(expected_instruction));

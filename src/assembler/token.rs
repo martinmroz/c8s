@@ -59,7 +59,7 @@ impl<'a> fmt::Display for Token<'a> {
       Token::Identifier(ref value, _)       => write!(f, "identifier ({})", value),
       Token::LabelMarker(_)                 => write!(f, "label marker"),
       Token::StringLiteral(ref value, _)    => write!(f, "string literal (\"{}\")", value),
-      Token::NumericLiteral(ref value, _)   => write!(f, "numeric literal ({})", value),
+      Token::NumericLiteral(ref value, _)   => write!(f, "numeric literal ({} / ${:X})", value, value),
       Token::Comma(_)                       => write!(f, "comma"),
       Token::Newline(_)                     => write!(f, "newline"),
       Token::Error(ref reason, _)           => write!(f, "{}", reason)
@@ -84,7 +84,7 @@ mod tests {
     assert_eq!(format!("{}", Token::Identifier("test_id", location.clone())), "identifier (test_id)");
     assert_eq!(format!("{}", Token::LabelMarker(location.clone())), "label marker");
     assert_eq!(format!("{}", Token::StringLiteral(Cow::Borrowed("Hello"), location.clone())), "string literal (\"Hello\")");
-    assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12)");
+    assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12 / $C)");
     assert_eq!(format!("{}", Token::Comma(location.clone())), "comma");
     assert_eq!(format!("{}", Token::Newline(location.clone())), "newline");
     assert_eq!(format!("{}", Token::Error(Cow::Borrowed("error_reason"), location.clone())), "error_reason");

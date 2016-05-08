@@ -3,9 +3,9 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::mem;
 
-use assembler::u12::*;
 use assembler::opcode::Opcode;
 use assembler::parser::{Literal, Node, InstructionField};
+use assembler::u12::*;
 
 // MARK: - Result Type
 
@@ -97,9 +97,7 @@ fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal>) -> usize
       match *argument {
         Literal::Numeric(number) if number <= 0xFF => { acc + 1 }
         Literal::String(ref string) => { acc + string.len() }
-        _ => { 
-          panic!("Semantic analysis for directive .{} failed.", identifier); 
-        }
+        _ => unreachable!()
       }
     });
   }
@@ -118,6 +116,15 @@ fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, usiz
   match label_map.get(label) {
     Some(value) => Ok(value.as_u12().unwrap()),
            None => Err(format!("Unable to resolve address of label {}", label))
+  }
+}
+
+/**
+ */
+fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
+  match literal.as_u8() {
+    Some(value) => Ok(value),
+           None => Err(format!("Found 12-bit numeric literal ${:X}, expecting 8-bit value.", literal.as_usize()))
   }
 }
 
@@ -148,7 +155,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
   if fields.len() == 1 {
     opcode = match (mnemonic, fields.get(0).unwrap()) {
 
-      ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target.as_u12().unwrap() }),
+      ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target }),
 
       // The 'jp' mnemonic may reference a label.
       ("jp", &InstructionField::Identifier(label)) => {
@@ -156,7 +163,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
         Some(Opcode::JP { target: address })
       }
 
-      ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target.as_u12().unwrap() }),
+      ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target }),
 
       // The 'call' mnemonic may reference a label.
       ("call", &InstructionField::Identifier(label)) => {
@@ -172,11 +179,11 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
   if fields.len() == 2 {
     opcode = match (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap()) {
       ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::SE_IMMEDIATE { register_x: x, value: value as u8 })
+        Some(Opcode::SE_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
       }
 
       ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::SNE_IMMEDIATE { register_x: x, value: value as u8 })
+        Some(Opcode::SNE_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
       }
 
       ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
@@ -188,11 +195,11 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
       }
 
       ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::LD_IMMEDIATE { register_x: x, value: value as u8 })
+        Some(Opcode::LD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
       }
 
       ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::ADD_IMMEDIATE { register_x: x, value: value as u8 })
+        Some(Opcode::ADD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
       }
 
       ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
@@ -232,7 +239,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
       }
 
       ("ld", &InstructionField::IndexRegister, &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::LD_I { value: value.as_u12().unwrap() })
+        Some(Opcode::LD_I { value: value })
       }
 
       // The mnemonic 'ld i' can take a label parameter.
@@ -242,7 +249,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
       }
 
       ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::JP_V0 { value: value.as_u12().unwrap() })
+        Some(Opcode::JP_V0 { value: value })
       }
 
       // The mnemonic 'jp v0' can take a label parameter.
@@ -252,7 +259,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
       }
 
       ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::RND { register_x: x, mask: value as u8 })
+        Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(value)) })
       }
 
       ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
@@ -311,7 +318,7 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
       &InstructionField::GeneralPurposeRegister(x), 
       &InstructionField::GeneralPurposeRegister(y),
       &InstructionField::NumericLiteral(value)) = tuple {
-      opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: value as u8} );
+      opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_8_bit_field(value)) } );
     }
   }
 
