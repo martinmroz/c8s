@@ -27,8 +27,8 @@ impl<'a> Scanner<'a> {
        static ref WHITESPACE: Regex = Regex::new(r"^[^\S\n]+").unwrap();
     }
     match WHITESPACE.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => { self.advance_by(byte_index_end); }
-      None => {}
+      Some((0, byte_index_end)) => { self.advance_by(byte_index_end); }
+      _ => {}
     };
   }
 
@@ -50,7 +50,7 @@ impl<'a> Scanner<'a> {
        static ref STRING_LITERAL: Regex = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
     }
     match STRING_LITERAL.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => {
+      Some((0, byte_index_end)) => {
         // Remove the leading and trailing quotation marks from the string literal.
         let slice_start = self.position + '"'.len_utf8();
         let slice_end = self.position + byte_index_end - '"'.len_utf8();
@@ -58,7 +58,7 @@ impl<'a> Scanner<'a> {
         let location = self.advance_by(byte_index_end);
         Token::StringLiteral(String::from(slice), location)
       }
-      None => {
+      _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
@@ -76,7 +76,7 @@ impl<'a> Scanner<'a> {
        static ref HEX_LITERAL: Regex = Regex::new(r#"^\$[0-9a-fA-F]{1,3}"#).unwrap();
     }
     match HEX_LITERAL.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => {
+      Some((0, byte_index_end)) => {
         // Strip off the leading '$' and parse the hexadecimal value.
         let slice_start = self.position + '$'.len_utf8();
         let slice_end = self.position + byte_index_end;
@@ -84,7 +84,7 @@ impl<'a> Scanner<'a> {
         let location = self.advance_by(byte_index_end);
         Token::NumericLiteral(usize::from_str_radix(slice, 16).ok().unwrap(), location)
       }
-      None => {
+      _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
@@ -102,7 +102,7 @@ impl<'a> Scanner<'a> {
        static ref DECIMAL_LITERAL: Regex = Regex::new(r#"^[0-9]{1,}"#).unwrap();
     }
     match DECIMAL_LITERAL.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => {
+      Some((0, byte_index_end)) => {
         // Strip off the leading '$' and parse the hexadecimal value.
         let slice_start = self.position;
         let slice_end = self.position + byte_index_end;
@@ -122,7 +122,7 @@ impl<'a> Scanner<'a> {
           }
         }
       }
-      None => {
+      _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
@@ -140,13 +140,13 @@ impl<'a> Scanner<'a> {
        static ref IDENTIFIER: Regex = Regex::new(r#"^[_a-zA-Z][_a-zA-Z0-9]{0,}"#).unwrap();
     }
     match IDENTIFIER.find(&self.input[self.position .. ]) {
-      Some((_, byte_index_end)) => {
+      Some((0, byte_index_end)) => {
         // Strip off the leading '$' and parse the hexadecimal value.
         let slice = &self.input[self.position .. self.position + byte_index_end];
         let location = self.advance_by(byte_index_end);
         Token::Identifier(slice, location)
       }
-      None => {
+      _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
