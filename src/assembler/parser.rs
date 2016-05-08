@@ -1,5 +1,4 @@
 
-use std::borrow::Cow;
 use std::mem;
 
 use assembler::token::Token;
@@ -10,7 +9,7 @@ use assembler::u12::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'a> {
     /// A literal string value.
-    String(Cow<'a, str>),
+    String(&'a str),
     /// A literal numeric value.
     Numeric(usize)
 }
@@ -386,8 +385,6 @@ pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterat
 #[cfg(test)]
 mod tests {
   
-  use std::borrow::Cow;
-
   use assembler::scanner::Scanner;
   use assembler::u12::*;
 
@@ -414,7 +411,7 @@ mod tests {
     parser = Parser::new(Scanner::new("-", "1\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::Numeric(1)]));
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
-    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String(Cow::Borrowed("Hello"))]));
+    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String("Hello")]));
 
     // A literal list can end in a trailing comma.
     parser = Parser::new(Scanner::new("-", "1,\n"));
@@ -428,7 +425,7 @@ mod tests {
     // A literal can contain multiple items of the different types.
     parser = Parser::new(Scanner::new("-", "1,\"Hello\",3\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Ok(vec![Literal::Numeric(1), Literal::String(Cow::Borrowed("Hello")), Literal::Numeric(3)]));
+      Ok(vec![Literal::Numeric(1), Literal::String("Hello"), Literal::Numeric(3)]));
   }
 
   #[test]
@@ -440,7 +437,7 @@ mod tests {
 
     // Test a db directive.
     let mut db_parser = Parser::new(Scanner::new("-", ".db \"Hello, World!\", $0\n"));
-    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String(Cow::Borrowed("Hello, World!")), Literal::Numeric(0)] };
+    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)] };
     assert_eq!(db_parser.parse_directive(), Ok(expected_db));
 
     // Test a fictional argument-free directive.

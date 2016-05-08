@@ -58,7 +58,7 @@ impl<'a> Scanner<'a> {
         let slice_end = self.position + byte_index_end - '"'.len_utf8();
         let slice = &self.input[slice_start .. slice_end];
         let location = self.advance_by(byte_index_end);
-        Token::StringLiteral(Cow::Borrowed(slice), location)
+        Token::StringLiteral(slice, location)
       }
       _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
@@ -528,10 +528,10 @@ mod tests {
   #[test]
   fn test_string_literal() {
     let mut scanner = Scanner::new("-", "\"\" \"a\" \"😊😞\" \"123\" \"end-of-line");
-    assert_eq!(scanner.next(), Some(Token::StringLiteral(Cow::Borrowed(""), SourceFileLocation::new("-", 1, 1, 2))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral(Cow::Borrowed("a"), SourceFileLocation::new("-", 1, 4, 3))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral(Cow::Borrowed("😊😞"), SourceFileLocation::new("-", 1, 8, 4))));
-    assert_eq!(scanner.next(), Some(Token::StringLiteral(Cow::Borrowed("123"), SourceFileLocation::new("-", 1, 13, 5))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("", SourceFileLocation::new("-", 1, 1, 2))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new("-", 1, 4, 3))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("😊😞", SourceFileLocation::new("-", 1, 8, 4))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new("-", 1, 13, 5))));
     assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid quoted string literal."), SourceFileLocation::new("-", 1, 19, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
@@ -540,7 +540,7 @@ mod tests {
   #[test]
   fn test_string_literal_multiline() {
     let mut scanner = Scanner::new("-", "\"Hello 😊\n🐳 World\"");
-    assert_eq!(scanner.next(), Some(Token::StringLiteral(Cow::Borrowed("Hello 😊\n🐳 World"), SourceFileLocation::new("-", 1, 1, 9))));
+    assert_eq!(scanner.next(), Some(Token::StringLiteral("Hello 😊\n🐳 World", SourceFileLocation::new("-", 1, 1, 9))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }

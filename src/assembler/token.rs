@@ -15,7 +15,7 @@ pub enum Token<'a> {
   /// A colon.
   LabelMarker(SourceFileLocation<'a>),
   /// A string literal, contained in double-quotes. Quotes are not included in the value and it is unescaped.
-  StringLiteral(Cow<'a, str>, SourceFileLocation<'a>),
+  StringLiteral(&'a str, SourceFileLocation<'a>),
   /// A numeric literal value.
   NumericLiteral(usize, SourceFileLocation<'a>),
   /// List separator token ','.
@@ -83,7 +83,7 @@ mod tests {
     assert_eq!(format!("{}", Token::DirectiveMarker(location.clone())), "directive marker");
     assert_eq!(format!("{}", Token::Identifier("test_id", location.clone())), "identifier (test_id)");
     assert_eq!(format!("{}", Token::LabelMarker(location.clone())), "label marker");
-    assert_eq!(format!("{}", Token::StringLiteral(Cow::Borrowed("Hello"), location.clone())), "string literal (\"Hello\")");
+    assert_eq!(format!("{}", Token::StringLiteral("Hello", location.clone())), "string literal (\"Hello\")");
     assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12 / $C)");
     assert_eq!(format!("{}", Token::Comma(location.clone())), "comma");
     assert_eq!(format!("{}", Token::Newline(location.clone())), "newline");
