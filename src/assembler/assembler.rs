@@ -120,6 +120,9 @@ fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, usiz
 }
 
 /**
+ Converts a 12-bit (unsigned) literal value to 8-bits if possible to do so without data loss.
+ @param literal 12-bit literal.
+ @return A result consisting of the low 8 bits of the 12-bit literal or an explanation as to why conversion failed.
  */
 fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
   match literal.as_u8() {
