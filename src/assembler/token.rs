@@ -45,20 +45,6 @@ impl<'a> Token<'a> {
   }
 }
 
-/**
- Un-parameterized display names for tokens.
- */
-pub mod display_names {
-  pub const SINGLE_LINE_COMMENT: &'static str = "single-line comment";
-  pub const DIRECTIVE_MARKER: &'static str = "directive marker";
-  pub const IDENTIFIER: &'static str = "identifier";
-  pub const LABEL_MARKER: &'static str = "label marker";
-  pub const STRING_LITERAL: &'static str = "string literal";
-  pub const NUMERIC_LITERAL: &'static str = "numeric literal";
-  pub const COMMA: &'static str = "comma";
-  pub const NEWLINE: &'static str = "newline";
-}
-
 impl<'a> fmt::Display for Token<'a> {
   /**
    Formats the receiver for display purposes. This includes the associated value if any
@@ -79,6 +65,20 @@ impl<'a> fmt::Display for Token<'a> {
       Token::Error(ref reason, _)           => write!(f, "{}", reason)
     }
   }
+}
+
+/**
+ Un-parameterized display names for tokens.
+ */
+pub mod display_names {
+  pub const SINGLE_LINE_COMMENT: &'static str = "single-line comment";
+  pub const DIRECTIVE_MARKER: &'static str    = "directive marker";
+  pub const IDENTIFIER: &'static str          = "identifier";
+  pub const LABEL_MARKER: &'static str        = "label marker";
+  pub const STRING_LITERAL: &'static str      = "string literal";
+  pub const NUMERIC_LITERAL: &'static str     = "numeric literal";
+  pub const COMMA: &'static str               = "comma";
+  pub const NEWLINE: &'static str             = "newline";
 }
 
 #[cfg(test)]
