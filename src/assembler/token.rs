@@ -1,4 +1,5 @@
 
+use std::borrow::Cow;
 use std::fmt;
 
 use assembler::source_file_location::SourceFileLocation;
@@ -14,7 +15,7 @@ pub enum Token<'a> {
   /// A colon.
   LabelMarker(SourceFileLocation<'a>),
   /// A string literal, contained in double-quotes. Quotes are not included in the value and it is unescaped.
-  StringLiteral(String, SourceFileLocation<'a>),
+  StringLiteral(Cow<'a, str>, SourceFileLocation<'a>),
   /// A numeric literal value.
   NumericLiteral(usize, SourceFileLocation<'a>),
   /// List separator token ','.
@@ -22,7 +23,7 @@ pub enum Token<'a> {
   /// Newline, a \n character.
   Newline(SourceFileLocation<'a>),
   /// An including the reason that the tokenization failed.
-  Error(String, SourceFileLocation<'a>)
+  Error(Cow<'a, str>, SourceFileLocation<'a>)
 }
 
 impl<'a> Token<'a> {
@@ -69,6 +70,8 @@ impl<'a> fmt::Display for Token<'a> {
 #[cfg(test)]
 mod tests {
   
+  use std::borrow::Cow;
+  
   use super::*;
 
   use assembler::source_file_location::SourceFileLocation;
@@ -80,11 +83,11 @@ mod tests {
     assert_eq!(format!("{}", Token::DirectiveMarker(location.clone())), "directive marker");
     assert_eq!(format!("{}", Token::Identifier("test_id", location.clone())), "identifier (test_id)");
     assert_eq!(format!("{}", Token::LabelMarker(location.clone())), "label marker");
-    assert_eq!(format!("{}", Token::StringLiteral(String::from("Hello"), location.clone())), "string literal (\"Hello\")");
+    assert_eq!(format!("{}", Token::StringLiteral(Cow::Borrowed("Hello"), location.clone())), "string literal (\"Hello\")");
     assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12)");
     assert_eq!(format!("{}", Token::Comma(location.clone())), "comma");
     assert_eq!(format!("{}", Token::Newline(location.clone())), "newline");
-    assert_eq!(format!("{}", Token::Error(String::from("error_reason"), location.clone())), "error_reason");
+    assert_eq!(format!("{}", Token::Error(Cow::Borrowed("error_reason"), location.clone())), "error_reason");
   }
 
 }

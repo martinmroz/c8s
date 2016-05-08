@@ -1,4 +1,5 @@
 
+use std::borrow::Cow;
 use std::mem;
 
 use assembler::token::Token;
@@ -6,9 +7,9 @@ use assembler::token::Token;
 // MARK: - Abstract Syntax List
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+pub enum Literal<'a> {
     /// A literal string value.
-    String(String),
+    String(Cow<'a, str>),
     /// A literal numeric value.
     Numeric(usize)
 }
@@ -35,7 +36,7 @@ pub enum InstructionField<'a> {
 
 #[derive(Debug, PartialEq)]
 pub enum Node<'a> {
-    Directive   { identifier: &'a str, arguments: Vec<Literal> },
+    Directive   { identifier: &'a str, arguments: Vec<Literal<'a>> },
     Label       { identifier: &'a str },
     Instruction {   mnemonic: &'a str,    fields: Vec<InstructionField<'a>> }
 }
@@ -142,7 +143,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    literal ::= STRING | NUMERIC.
    @return The literal if successful, or an error.
    */
-  fn parse_literal(&mut self) -> Result<Literal, String> {
+  fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
     match self.current_token.clone() {
 
       // Match and consume a string literal token.
@@ -169,7 +170,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @param list Provide an empty Vec<Literal>.
    @return A list of literals if successful, or an error.
    */
-  fn parse_literal_list(&mut self, list: Vec<Literal>) -> Result<Vec<Literal>, String> {
+  fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
     
     // The literal list is complete.
     if let Some(Token::Newline(_)) = self.current_token {
@@ -384,6 +385,8 @@ pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterat
 #[cfg(test)]
 mod tests {
   
+  use std::borrow::Cow;
+
   use super::Parser;
   use super::{Literal, Node, InstructionField};
 
@@ -409,7 +412,7 @@ mod tests {
     parser = Parser::new(Scanner::new("-", "1\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::Numeric(1)]));
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
-    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String(String::from("Hello"))]));
+    assert_eq!(parser.parse_literal_list(Vec::new()), Ok(vec![Literal::String(Cow::Borrowed("Hello"))]));
 
     // A literal list can end in a trailing comma.
     parser = Parser::new(Scanner::new("-", "1,\n"));
@@ -423,7 +426,7 @@ mod tests {
     // A literal can contain multiple items of the different types.
     parser = Parser::new(Scanner::new("-", "1,\"Hello\",3\n"));
     assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Ok(vec![Literal::Numeric(1), Literal::String(String::from("Hello")), Literal::Numeric(3)]));
+      Ok(vec![Literal::Numeric(1), Literal::String(Cow::Borrowed("Hello")), Literal::Numeric(3)]));
   }
 
   #[test]
@@ -435,7 +438,7 @@ mod tests {
 
     // Test a db directive.
     let mut db_parser = Parser::new(Scanner::new("-", ".db \"Hello, World!\", $0\n"));
-    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String(String::from("Hello, World!")), Literal::Numeric(0)] };
+    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String(Cow::Borrowed("Hello, World!")), Literal::Numeric(0)] };
     assert_eq!(db_parser.parse_directive(), Ok(expected_db));
 
     // Test a fictional argument-free directive.

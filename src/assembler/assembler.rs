@@ -1,6 +1,7 @@
 
-use std::mem;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::mem;
 
 use assembler::u12::*;
 use assembler::opcode::Opcode;
@@ -449,6 +450,8 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String
 #[cfg(test)]
 mod tests {
   
+  use std::borrow::Cow;
+
   use super::{validate_directive_semantics, size_of_directive};
   use super::define_labels;
 
@@ -464,7 +467,7 @@ mod tests {
     assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (2) for directive .org, expecting 1.".to_string()));
     params = vec![Literal::Numeric(0x1000)];
     assert_eq!(validate_directive_semantics("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
-    params = vec![Literal::String(String::from("TEST_STRING"))];
+    params = vec![Literal::String(Cow::Borrowed("TEST_STRING"))];
     assert_eq!(validate_directive_semantics("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
     params = vec![Literal::Numeric(0xFFF)];
     assert_eq!(validate_directive_semantics("org", &params), Ok(()));
@@ -478,13 +481,13 @@ mod tests {
     assert_eq!(validate_directive_semantics("db", &params), Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
     params = vec![Literal::Numeric(0x100)];
     assert_eq!(validate_directive_semantics("db", &params), Err("All numeric parameters to .db must be 1-byte literals ($100 > $FF)".to_string()));
-    params = vec![Literal::String(String::from("TEST_STRING"))];
+    params = vec![Literal::String(Cow::Borrowed("TEST_STRING"))];
     assert_eq!(validate_directive_semantics("db", &params), Ok(()));
     params = vec![Literal::Numeric(0xFF)];
     assert_eq!(validate_directive_semantics("db", &params), Ok(()));
     params = vec![Literal::Numeric(0x00)];
     assert_eq!(validate_directive_semantics("db", &params), Ok(()));
-    params = vec![Literal::String(String::from("TEST_STRING")), Literal::Numeric(0x00)];
+    params = vec![Literal::String(Cow::Borrowed("TEST_STRING")), Literal::Numeric(0x00)];
     assert_eq!(validate_directive_semantics("db", &params), Ok(()));
   }
 
@@ -500,15 +503,15 @@ mod tests {
   fn test_size_of_directive_for_org() {
     assert_eq!(size_of_directive("org", &vec![]), 0);
     assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100)]), 0);
-    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100), Literal::String(String::from("TEST_STRING"))]), 0);
+    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100), Literal::String(Cow::Borrowed("TEST_STRING"))]), 0);
   }
 
   #[test]
   fn test_size_of_directive_for_db() {
     assert_eq!(size_of_directive("db", &vec![]), 0);
     assert_eq!(size_of_directive("db", &vec![Literal::Numeric(0xFF)]), 1);
-    assert_eq!(size_of_directive("db", &vec![Literal::String(String::from("TEST_STRING"))]), 11);
-    assert_eq!(size_of_directive("db", &vec![Literal::String(String::from("TEST_STRING")), Literal::Numeric(0x00)]), 12);
+    assert_eq!(size_of_directive("db", &vec![Literal::String(Cow::Borrowed("TEST_STRING"))]), 11);
+    assert_eq!(size_of_directive("db", &vec![Literal::String(Cow::Borrowed("TEST_STRING")), Literal::Numeric(0x00)]), 12);
   }
 
   #[test]
