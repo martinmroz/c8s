@@ -336,7 +336,9 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       return Ok(instruction_node);
     }
 
-    Err(format!("Failed to parse statement."))
+    // Generate syntax error based on token display names.
+    let expecting = format!("{} or {}", display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER);
+    Err(self.syntax_error_for_unexpected_token(expecting.as_str()))
   }
 
   /**
