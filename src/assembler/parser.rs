@@ -45,8 +45,18 @@ pub struct LabelData<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct DirectiveData<'a> {
+  /// The location at which the directive is defined for error reporting purposes.
+  pub location: SourceFileLocation<'a>,
+  /// The name of the directive (db, org).
+  pub identifier: &'a str,
+  /// Arguments to the directive.
+  pub arguments: Vec<Literal<'a>> 
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Node<'a> {
-    Directive   { identifier: &'a str, arguments: Vec<Literal<'a>> },
+    Directive   (DirectiveData<'a>),
     Label       (LabelData<'a>),
     Instruction {   mnemonic: &'a str,    fields: Vec<InstructionField<'a>> }
 }
@@ -211,10 +221,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
     expect_and_consume!(self, Some(Token::DirectiveMarker(_)), display_names::DIRECTIVE_MARKER);
 
-    let (id, _)    = try!(self.parse_identifier());
+    let ( id,loc ) = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
 
-    Ok(Node::Directive { identifier: id, arguments: parameters })
+    let node_data = DirectiveData { location: loc, identifier: id, arguments: parameters };
+    Ok(Node::Directive(node_data))
   }
 
   /**
@@ -404,7 +415,7 @@ mod tests {
   use assembler::u12::*;
 
   use super::Parser;
-  use super::LabelData;
+  use super::{DirectiveData, LabelData};
   use super::{Literal, Node, InstructionField};
 
   #[test]
@@ -448,27 +459,41 @@ mod tests {
   fn test_parse_directive() {
     // Test an origin directive.
     let mut org_parser = Parser::new(Scanner::new("-", ".org $100\n"));
-    let expected_org = Node::Directive { identifier: "org", arguments: vec![Literal::Numeric(0x100)] };
-    assert_eq!(org_parser.parse_directive(), Ok(expected_org));
+    let expected_org_data = DirectiveData { 
+      location: SourceFileLocation::new("-", 1, 2, 3),
+      identifier: "org", 
+      arguments: vec![Literal::Numeric(0x100)] 
+    };
+    assert_eq!(org_parser.parse_directive(), Ok(Node::Directive(expected_org_data)));
 
     // Test a db directive.
     let mut db_parser = Parser::new(Scanner::new("-", ".db \"Hello, World!\", $0\n"));
-    let expected_db = Node::Directive { identifier: "db", arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)] };
-    assert_eq!(db_parser.parse_directive(), Ok(expected_db));
+    let expected_db_data = DirectiveData { 
+      location: SourceFileLocation::new("-", 1, 2, 2),
+      identifier: "db", 
+      arguments: vec![Literal::String("Hello, World!"), Literal::Numeric(0)]
+    };
+    assert_eq!(db_parser.parse_directive(), Ok(Node::Directive(expected_db_data)));
 
     // Test a fictional argument-free directive.
     let mut test_parser = Parser::new(Scanner::new("-", ".test\n"));
-    let expected_test = Node::Directive { identifier: "test", arguments: vec![] };
-    assert_eq!(test_parser.parse_directive(), Ok(expected_test));
+    let expected_test_data = DirectiveData { 
+      location: SourceFileLocation::new("-", 1, 2, 4),
+      identifier: "test", 
+      arguments: vec![]
+    };
+    assert_eq!(test_parser.parse_directive(), Ok(Node::Directive(expected_test_data)));
   }
 
   #[test]
   fn test_parse_label() {
     // Parse a label.
     let mut parser = Parser::new(Scanner::new("-", "a:\n"));
-    let expected_label_data = LabelData { identifier: "a", location: SourceFileLocation::new("-", 1, 1, 1) };
-    let expected_label = Node::Label(expected_label_data);
-    assert_eq!(parser.parse_label(), Ok(expected_label));
+    let expected_label_data = LabelData { 
+      location: SourceFileLocation::new("-", 1, 1, 1),
+      identifier: "a" 
+    };
+    assert_eq!(parser.parse_label(), Ok(Node::Label(expected_label_data)));
   }
 
   #[test]

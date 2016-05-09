@@ -349,15 +349,15 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, us
   // Define all labels and process '.org' directives.
   for node in syntax_list.iter() {
     match *node {
-      Node::Directive { identifier, ref arguments } => {
+      Node::Directive(ref data) => {
         // Validate the directive and that the arguments match the identifier.
-        try!(validate_directive_semantics(identifier, arguments));
+        try!(validate_directive_semantics(data.identifier, &data.arguments));
 
         // Adjust address by directive size.
-        current_address = current_address + size_of_directive(identifier, arguments);
+        current_address = current_address + size_of_directive(data.identifier, &data.arguments);
 
         // The origin directive changes the current address.
-        if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (identifier, &arguments[0]) {
+        if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (data.identifier, &data.arguments[0]) {
           current_address = address;
         }
       }
@@ -390,22 +390,22 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
 
   for node in syntax_list {
     match node {
-      Node::Directive { identifier, arguments } => {
-        match identifier {
+      Node::Directive(data) => {
+        match data.identifier {
           DIRECTIVE_ORG => {
             // Push the current data range into the list of ranges and start a new one at the 'org' point.
-            if let &Literal::Numeric(address) = arguments.get(0).unwrap() {
+            if let Some(&Literal::Numeric(address)) = data.arguments.get(0) {
               let new_range = DataRange::new(address);
               let previous_range = mem::replace(&mut current_range, new_range);
               data_ranges.push(previous_range);
             } else {
-              panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", identifier);
+              panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", data.identifier);
             }
           }
           
           DIRECTIVE_DB  => {
             // Emit all the literal arguments directly to the data range.
-            for literal in arguments {
+            for literal in data.arguments {
               match literal {
                 Literal::Numeric(numeric) => {
                   assert!(numeric <= 0xFF);
@@ -419,7 +419,7 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
           }
 
           _ => {
-            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", identifier);
+            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", data.identifier);
           }
         }
       }
@@ -472,6 +472,16 @@ mod tests {
       LabelData {
         location: SourceFileLocation::new("-", seq, 1, name.len()),
         identifier: name
+      }
+    )
+  }
+
+  fn make_directive_node<'a>(seq: usize, name: &'a str, args: Vec<Literal<'a>>) -> Node<'a> {
+    Node::Directive(
+      DirectiveData {
+        location: SourceFileLocation::new("-", seq, 2, name.len()),
+        identifier: name,
+        arguments: args
       }
     )
   }
@@ -542,12 +552,12 @@ mod tests {
   #[test]
   fn test_define_labels() {
     let program = vec![
-      Node::Directive   { identifier: "org", arguments: vec![Literal::Numeric(0x100)] },
-      make_label_node   (2, "label1"),
-      Node::Directive   { identifier: "db",  arguments: vec![Literal::Numeric(0xFF)]  },
-      make_label_node   (4, "label2"),
-      Node::Instruction {   mnemonic: "trap",   fields: vec![] },
-      make_label_node   (6, "label3"),
+      make_directive_node (1, "org", vec![Literal::Numeric(0x100)]),
+      make_label_node     (2, "label1"),
+      make_directive_node (3, "db", vec![Literal::Numeric(0xFF)]),
+      make_label_node     (4, "label2"),
+      Node::Instruction   { mnemonic: "trap", fields: vec![] },
+      make_label_node     (6, "label3"),
     ];
 
     let result = define_labels(&program);
@@ -570,7 +580,7 @@ mod tests {
   #[test]
   fn test_define_labels_does_semantic_analysis_on_org() {
     let program = vec![
-      Node::Directive { identifier: "org", arguments: vec![] },
+      make_directive_node(1, "org", vec![])
     ];
 
     let result = define_labels(&program);
@@ -580,7 +590,7 @@ mod tests {
   #[test]
   fn test_define_labels_does_semantic_analysis_on_db() {
     let program = vec![
-      Node::Directive { identifier: "db", arguments: vec![] },
+      make_directive_node(1, "db", vec![])
     ];
 
     let result = define_labels(&program);
