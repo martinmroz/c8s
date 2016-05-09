@@ -177,7 +177,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return The literal if successful, or an error.
    */
   fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
-    match self.current_token.clone() {
+    match self.current_token {
 
       // Match and consume a string literal token.
       Some(Token::StringLiteral(string, _)) => {
