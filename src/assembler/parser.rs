@@ -1,6 +1,7 @@
 
 use std::mem;
 
+use assembler::source_file_location::SourceFileLocation;
 use assembler::token::Token;
 use assembler::token::display_names;
 use assembler::u12::*;
@@ -36,9 +37,17 @@ pub enum InstructionField<'a> {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct LabelData<'a> {
+  /// The location at which the label is defined for error reporting purposes.
+  pub location: SourceFileLocation<'a>,
+  /// The name of the label.
+  pub identifier: &'a str
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Node<'a> {
     Directive   { identifier: &'a str, arguments: Vec<Literal<'a>> },
-    Label       { identifier: &'a str },
+    Label       (LabelData<'a>),
     Instruction {   mnemonic: &'a str,    fields: Vec<InstructionField<'a>> }
 }
 
@@ -131,9 +140,9 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    identifier ::= IDENTIFIER.
    @return The string value of the identifier if successful, or an error.
    */
-  fn parse_identifier(&mut self) -> Result<&'a str, String> {
-    if let Token::Identifier(identifier,_) = expect_and_consume!(self, Some(Token::Identifier(_,_)), display_names::IDENTIFIER) {
-      Ok(identifier)
+  fn parse_identifier(&mut self) -> Result<(&'a str, SourceFileLocation<'a>), String> {
+    if let Token::Identifier(id,loc) = expect_and_consume!(self, Some(Token::Identifier(_,_)), display_names::IDENTIFIER) {
+      Ok((id, loc))
     } else {
       unreachable!()
     }
@@ -202,10 +211,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_directive(&mut self) -> Result<Node<'a>, String> {
     expect_and_consume!(self, Some(Token::DirectiveMarker(_)), display_names::DIRECTIVE_MARKER);
 
-    let identifier = try!(self.parse_identifier());
+    let (id, _)    = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
 
-    Ok(Node::Directive { identifier: identifier, arguments: parameters })
+    Ok(Node::Directive { identifier: id, arguments: parameters })
   }
 
   /**
@@ -214,11 +223,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return A Label node if successful, or an error.
    */
   fn parse_label(&mut self) -> Result<Node<'a>, String> {
-    let identifier = try!(self.parse_identifier());
+    let (id, loc) = try!(self.parse_identifier());
 
     expect_and_consume!(self, Some(Token::LabelMarker(_)), display_names::LABEL_MARKER);
 
-    Ok(Node::Label { identifier: identifier })
+    let label_data = LabelData { location: loc, identifier: id };
+    Ok(Node::Label(label_data))
   }
 
   /**
@@ -305,7 +315,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return An Instruction node if successful, or an error.
    */
   fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
-    let mnemonic = try!(self.parse_identifier());
+    let (mnemonic, _) = try!(self.parse_identifier());
     let fields = try!(self.parse_field_list(Vec::new()));
 
     Ok(Node::Instruction { mnemonic: mnemonic, fields: fields })
@@ -389,10 +399,12 @@ pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterat
 #[cfg(test)]
 mod tests {
   
+  use assembler::source_file_location::SourceFileLocation;
   use assembler::scanner::Scanner;
   use assembler::u12::*;
 
   use super::Parser;
+  use super::LabelData;
   use super::{Literal, Node, InstructionField};
 
   #[test]
@@ -454,7 +466,8 @@ mod tests {
   fn test_parse_label() {
     // Parse a label.
     let mut parser = Parser::new(Scanner::new("-", "a:\n"));
-    let expected_label = Node::Label { identifier: "a" }; 
+    let expected_label_data = LabelData { identifier: "a", location: SourceFileLocation::new("-", 1, 1, 1) };
+    let expected_label = Node::Label(expected_label_data);
     assert_eq!(parser.parse_label(), Ok(expected_label));
   }
 

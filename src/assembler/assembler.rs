@@ -362,12 +362,12 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, us
         }
       }
 
-      Node::Label { identifier } => {
+      Node::Label(ref data) => {
         // Map the label to the current address and remove from the ASL.
-        if label_address_map.contains_key(&identifier) {
-          return Err(format!("Attempted re-definition of label {}.", identifier));
+        if label_address_map.contains_key(&data.identifier) {
+          return Err(format!("Attempted re-definition of label {}.", data.identifier));
         } else {
-          label_address_map.insert(identifier, current_address);
+          label_address_map.insert(data.identifier, current_address);
         }
       }
 
@@ -433,7 +433,7 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
         current_range.data.push(lo_8);
       }
 
-      Node::Label { identifier: _ } => {
+      Node::Label(_) => {
         // Processed in Pass 1.
       }
     }
@@ -459,10 +459,22 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String
 #[cfg(test)]
 mod tests {
   
+  use assembler::parser::*;
+  use assembler::source_file_location::SourceFileLocation;
+
   use super::{validate_directive_semantics, size_of_directive};
   use super::define_labels;
 
-  use assembler::parser::*;
+  // MARK: - Helpers
+
+  fn make_label_node<'a>(seq: usize, name: &'a str) -> Node<'a> {
+    Node::Label(
+      LabelData {
+        location: SourceFileLocation::new("-", seq, 1, name.len()),
+        identifier: name
+      }
+    )
+  }
 
   // MARK: - Pass 1 Tests
 
@@ -531,11 +543,11 @@ mod tests {
   fn test_define_labels() {
     let program = vec![
       Node::Directive   { identifier: "org", arguments: vec![Literal::Numeric(0x100)] },
-      Node::Label       { identifier: "label1" },
+      make_label_node   (2, "label1"),
       Node::Directive   { identifier: "db",  arguments: vec![Literal::Numeric(0xFF)]  },
-      Node::Label       { identifier: "label2" },
+      make_label_node   (4, "label2"),
       Node::Instruction {   mnemonic: "trap",   fields: vec![] },
-      Node::Label       { identifier: "label3" }
+      make_label_node   (6, "label3"),
     ];
 
     let result = define_labels(&program);
@@ -578,8 +590,8 @@ mod tests {
   #[test]
   fn test_define_labels_fails_on_redefinition() {
     let program = vec![
-      Node::Label { identifier: "L1" },
-      Node::Label { identifier: "L1" }
+      make_label_node(1, "L1"),
+      make_label_node(2, "L1"),
     ];
 
     let result = define_labels(&program);
