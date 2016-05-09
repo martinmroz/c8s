@@ -8,40 +8,22 @@ use assembler::u12::*;
 
 // MARK: - Abstract Syntax List
 
+#[derive(Debug, PartialEq)]
+pub enum Node<'a> {
+  /// A directive and corresponding parameters.
+  Directive(DirectiveData<'a>),
+  /// A label and corresponding parameters.
+  Label(LabelData<'a>),
+  /// An instruction and corresponding parameters.
+  Instruction(InstructionData<'a>)
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'a> {
-    /// A literal string value.
-    String(&'a str),
-    /// A literal numeric value.
-    Numeric(usize)
-}
-
-#[derive(Debug, PartialEq)]
-pub enum InstructionField<'a> {
-    /// A numeric literal value.
-    NumericLiteral(U12),
-    /// A general-purpose register beginning with "v".
-    GeneralPurposeRegister(u8),
-    /// The delay timer register ("dt").
-    DelayTimer,
-    /// The sound timer register ("st").
-    SoundTimer,
-    /// The keypad register ("k").
-    KeypadRegister,
-    /// The index register ("i").
-    IndexRegister,
-    /// Register-indirect access of memory ("[i]").
-    IndexRegisterIndirect,
-    /// Any other literal identifier, usually a label.
-    Identifier(&'a str)
-}
-
-#[derive(Debug, PartialEq)]
-pub struct LabelData<'a> {
-  /// The location at which the label is defined for error reporting purposes.
-  pub location: SourceFileLocation<'a>,
-  /// The name of the label.
-  pub identifier: &'a str
+  /// A literal string value.
+  String(&'a str),
+  /// A literal numeric value.
+  Numeric(usize)
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,10 +37,41 @@ pub struct DirectiveData<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Node<'a> {
-    Directive   (DirectiveData<'a>),
-    Label       (LabelData<'a>),
-    Instruction {   mnemonic: &'a str,    fields: Vec<InstructionField<'a>> }
+pub struct LabelData<'a> {
+  /// The location at which the label is defined for error reporting purposes.
+  pub location: SourceFileLocation<'a>,
+  /// The name of the label.
+  pub identifier: &'a str
+}
+
+#[derive(Debug, PartialEq)]
+pub enum InstructionField<'a> {
+  /// A numeric literal value.
+  NumericLiteral(U12),
+  /// A general-purpose register beginning with "v".
+  GeneralPurposeRegister(u8),
+  /// The delay timer register ("dt").
+  DelayTimer,
+  /// The sound timer register ("st").
+  SoundTimer,
+  /// The keypad register ("k").
+  KeypadRegister,
+  /// The index register ("i").
+  IndexRegister,
+  /// Register-indirect access of memory ("[i]").
+  IndexRegisterIndirect,
+  /// Any other literal identifier, usually a label.
+  Identifier(&'a str)
+}
+
+#[derive(Debug, PartialEq)]
+pub struct InstructionData<'a> {
+  /// The location at which the directive is defined for error reporting purposes.
+  pub location: SourceFileLocation<'a>,
+  /// The mnemonic corresponding to the operation.
+  pub mnemonic: &'a str,
+  /// Instruction fields for the mnemonic.
+  pub fields: Vec<InstructionField<'a>>
 }
 
 // MARK: - Local Parser Context
@@ -326,10 +339,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return An Instruction node if successful, or an error.
    */
   fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
-    let (mnemonic, _) = try!(self.parse_identifier());
-    let fields = try!(self.parse_field_list(Vec::new()));
+    let (mnemonic,loc) = try!(self.parse_identifier());
+    let list_of_fields = try!(self.parse_field_list(Vec::new()));
 
-    Ok(Node::Instruction { mnemonic: mnemonic, fields: fields })
+    let data = InstructionData { location: loc, mnemonic: mnemonic, fields: list_of_fields };
+    Ok(Node::Instruction(data))
   }
 
   /**
@@ -415,7 +429,7 @@ mod tests {
   use assembler::u12::*;
 
   use super::Parser;
-  use super::{DirectiveData, LabelData};
+  use super::{DirectiveData, InstructionData, LabelData};
   use super::{Literal, Node, InstructionField};
 
   #[test]
@@ -563,17 +577,26 @@ mod tests {
   fn test_parse_instruction() {
     // Test an instruction with no fields.
     let mut parser = Parser::new(Scanner::new("-", "nop\n"));
-    let mut expected_instruction = Node::Instruction { mnemonic: "nop", fields: vec![] };
-    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+    let mut expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 3),
+      mnemonic: "nop",
+      fields: vec![]
+    };
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
 
     // Test an instruction with one address target.
     parser = Parser::new(Scanner::new("-", "jp $002\n"));
-    expected_instruction = Node::Instruction { mnemonic: "jp", fields: vec![ InstructionField::NumericLiteral(U12::from(2)) ]};
-    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+    expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 2),
+      mnemonic: "jp",
+      fields: vec![ InstructionField::NumericLiteral(U12::from(2)) ]
+    };
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
 
     // Test an instruction with a heterogenous field list.
     parser = Parser::new(Scanner::new("-", "drw v1, v2, $fe\n"));
-    expected_instruction = Node::Instruction { 
+    expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 3),
       mnemonic: "drw", 
       fields: vec![
         InstructionField::GeneralPurposeRegister(1),
@@ -581,7 +604,7 @@ mod tests {
         InstructionField::NumericLiteral(U12::from(254))
       ]
     };
-    assert_eq!(parser.parse_instruction(), Ok(expected_instruction));
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
   }
 
 }

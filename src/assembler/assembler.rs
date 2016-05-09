@@ -371,7 +371,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, us
         }
       }
 
-      Node::Instruction { mnemonic: _, fields: _ } => {
+      Node::Instruction(_) => {
         // All Chip8 instructions are the same length.
         current_address = current_address + BYTES_PER_INSTRUCTION;
       }
@@ -402,7 +402,7 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
               panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", data.identifier);
             }
           }
-          
+
           DIRECTIVE_DB  => {
             // Emit all the literal arguments directly to the data range.
             for literal in data.arguments {
@@ -418,15 +418,15 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
             }
           }
 
-          _ => {
-            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", data.identifier);
+          id @ _ => {
+            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", id);
           }
         }
       }
 
-      Node::Instruction { mnemonic, fields } => {
+      Node::Instruction(data) => {
         // Verify the semantics and append the instruction to the output buffer.
-        let instruction_word = try!(assemble_instruction(mnemonic, fields, label_address_map));
+        let instruction_word = try!(assemble_instruction(data.mnemonic, data.fields, label_address_map));
         let hi_8 = ((instruction_word & 0xFF00) >> 8) as u8;
         let lo_8 = ((instruction_word & 0x00FF) >> 8) as u8;
         current_range.data.push(hi_8);
@@ -467,8 +467,9 @@ mod tests {
 
   // MARK: - Helpers
 
+  /// Creates a Label type node with associated data at location "-:seq:1-name.len()".
   fn make_label_node<'a>(seq: usize, name: &'a str) -> Node<'a> {
-    Node::Label(
+    Node::Label (
       LabelData {
         location: SourceFileLocation::new("-", seq, 1, name.len()),
         identifier: name
@@ -476,12 +477,24 @@ mod tests {
     )
   }
 
+  /// Creates a Directive type node with associated data at location "-:seq:2-name.len()+1".
   fn make_directive_node<'a>(seq: usize, name: &'a str, args: Vec<Literal<'a>>) -> Node<'a> {
-    Node::Directive(
+    Node::Directive (
       DirectiveData {
         location: SourceFileLocation::new("-", seq, 2, name.len()),
         identifier: name,
         arguments: args
+      }
+    )
+  }
+
+  /// Creates an Instruction type node with associated data at location "-:seq:1-name.len()".
+  fn make_instruction_node<'a>(seq: usize, name: &'a str, fields: Vec<InstructionField<'a>>) -> Node<'a> {
+    Node::Instruction (
+      InstructionData {
+        location: SourceFileLocation::new("-", seq, 1, name.len()),
+        mnemonic: name,
+        fields: fields
       }
     )
   }
@@ -552,12 +565,12 @@ mod tests {
   #[test]
   fn test_define_labels() {
     let program = vec![
-      make_directive_node (1, "org", vec![Literal::Numeric(0x100)]),
-      make_label_node     (2, "label1"),
-      make_directive_node (3, "db", vec![Literal::Numeric(0xFF)]),
-      make_label_node     (4, "label2"),
-      Node::Instruction   { mnemonic: "trap", fields: vec![] },
-      make_label_node     (6, "label3"),
+      make_directive_node   (1, "org", vec![Literal::Numeric(0x100)]),
+      make_label_node       (2, "label1"),
+      make_directive_node   (3, "db", vec![Literal::Numeric(0xFF)]),
+      make_label_node       (4, "label2"),
+      make_instruction_node (5, "trap", vec![]),
+      make_label_node       (6, "label3"),
     ];
 
     let result = define_labels(&program);
