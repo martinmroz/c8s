@@ -17,7 +17,7 @@ pub struct DataRange {
 }
 
 impl DataRange {
-  fn new(start_address: usize) -> DataRange {
+  fn new(start_address: usize) -> Self {
     assert!(start_address <= 0xFFF);
     DataRange {
       start_address: start_address,

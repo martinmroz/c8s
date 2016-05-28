@@ -30,7 +30,7 @@ impl<'a> SourceFileLocation<'a> {
    @param location The offset from the start of the input, in code points, starting at 1. Asserts if 0.
    @param length The number of code points corresponding to the location. Asserts if 0.
    */
-  pub fn new(file_name: &'a str, line: usize, location: usize, length: usize) -> SourceFileLocation<'a> {
+  pub fn new(file_name: &'a str, line: usize, location: usize, length: usize) -> Self {
     assert!(line > 0 && location > 0 && length > 0);
     SourceFileLocation {
       file_name: file_name,

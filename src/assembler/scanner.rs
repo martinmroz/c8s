@@ -329,7 +329,7 @@ impl<'a> Scanner<'a> {
   /**
    @return A new scanner over the provided input.
    */
-  pub fn new(file_name: &'a str, input: &'a str) -> Scanner<'a> {
+  pub fn new(file_name: &'a str, input: &'a str) -> Self {
     Scanner {
       file_name: file_name,
       input: input,

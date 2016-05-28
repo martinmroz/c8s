@@ -111,7 +111,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
   // MARK: - Initializers
 
-  fn new(scanner: I) -> Parser<'a, I> {
+  fn new(scanner: I) -> Self {
     let mut parser = Parser {
       scanner: scanner,
       current_token: None,
