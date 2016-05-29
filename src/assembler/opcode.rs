@@ -355,7 +355,6 @@ mod tests {
       let opcode = Opcode::from_instruction(instruction);
       assert_eq!(opcode.to_assembly_string(), assembly_string);
     }
-
   }
 
 }
