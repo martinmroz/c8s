@@ -61,12 +61,12 @@ impl DataRange {
    Appends the slice to the end of the data range. Checks for capacity in advance.
    @param data The bytes to append to the data range.
    */
-  pub fn append(&mut self, data: &[u8]) -> Result<(), String> {
+  pub fn append(&mut self, data: &[u8]) -> bool {
     if self.bytes_remaining() >= data.len() {
       self.data.extend_from_slice(data);
-      Ok(())
+      true
     } else {
-      Err(format!("unable to emit data of length {} into range starting at ${:3X}", data.len(), self.start_address.as_usize()))
+      false
     }
   }
 
@@ -109,14 +109,14 @@ mod tests {
 
     // Append a single byte to the data range.
     let one_byte_slice: &[u8] = &[1];
-    assert_eq!(program_space.append(one_byte_slice), Ok(()));
+    assert_eq!(program_space.append(one_byte_slice), true);
     assert_eq!(program_space.len(), 1);
     assert_eq!(program_space.bytes_remaining(), 3583);
     assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(U12::from(1)));
 
     // Append a single byte to the data range.
     let two_byte_slice: &[u8] = &[2, 3];
-    assert_eq!(program_space.append(two_byte_slice), Ok(()));
+    assert_eq!(program_space.append(two_byte_slice), true);
     assert_eq!(program_space.len(), 3);
     assert_eq!(program_space.bytes_remaining(), 3581);
     assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(U12::from(3)));
@@ -131,7 +131,7 @@ mod tests {
     let one_byte_slice: &[u8] = &[1];
 
     // Append data into the only slot in the data range.
-    assert_eq!(max_range.append(one_byte_slice), Ok(()));
+    assert_eq!(max_range.append(one_byte_slice), true);
     assert_eq!(max_range.len(), 1);
     assert_eq!(max_range.bytes_remaining(), 0);
     assert_eq!(max_range.address_range(), u12::MAX .. u12::MIN);
@@ -140,7 +140,7 @@ mod tests {
     assert_eq!(max_range.data(), &vec![1]);
 
     // Attempt to apppend past the end of the data range.
-    assert_eq!(max_range.append(one_byte_slice), Err(format!("unable to emit data of length 1 into range starting at $FFF")));
+    assert_eq!(max_range.append(one_byte_slice), false);
     assert_eq!(max_range.len(), 1);
     assert_eq!(max_range.bytes_remaining(), 0);
     assert_eq!(max_range.address_range(), u12::MAX .. u12::MIN);
