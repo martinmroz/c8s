@@ -1,18 +1,18 @@
 
-use std::ops::{Mul};
-use std::fmt;
 use std::convert::From;
+use std::fmt;
+use std::ops::Sub;
 
-#[derive(PartialEq, Eq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
 pub struct U12(u16);
 
 impl U12 {
 
-    pub fn zero() -> U12 {
+    pub fn zero() -> Self {
         U12(0)
     }
 
-    pub fn one() -> U12 {
+    pub fn one() -> Self {
         U12(1)
     }
 
@@ -35,6 +35,14 @@ impl U12 {
         U12((self.0 + other.0) & 0xFFF)
     }
 
+    pub fn checked_sub(self, other: U12) -> Option<U12> {
+        if other > self {
+            None
+        } else {
+            Some(self - other)
+        }
+    }
+
     pub fn hi_4(self) -> u8 {
         ((self.0 & 0x0F00) >> 8) as u8
     }
@@ -48,25 +56,24 @@ impl U12 {
 pub const MAX: U12 = U12(0xFFF);
 pub const MIN: U12 = U12(0x000);
 
-// Basic Operations
-
-impl Mul for U12 {
-    type Output = U12;
-    fn mul(self, other: U12) -> U12 {
-        // The implementation of sub() on U16 will panic at the same times as on U12.
-        let product = self.0 * other.0;
-        if (product & 0xF000) != 0 {
-            panic!("Arithmetic operation overflowed");
-        }
-        U12(product)
-    }
-}
-
 // Formatting
 
 impl fmt::Debug for U12 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:#3X}", self.0) 
+    }
+}
+
+// Mathematical Operations
+
+impl Sub for U12 {
+    type Output = U12;
+    fn sub(self, rhs: U12) -> Self::Output {
+        if rhs > self {
+            panic!("arithmetic underflow atteming to subtract {:?} from {:?}", rhs, self);
+        } else {
+            (self.0 - rhs.0).as_u12().unwrap()
+        }
     }
 }
 
