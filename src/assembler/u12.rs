@@ -31,11 +31,11 @@ impl U12 {
     }
   }
 
-  pub fn wrapping_add(self, other: U12) -> U12 {
+  pub fn wrapping_add(self, other: U12) -> Self {
     U12((self.0 + other.0) & 0xFFF)
   }
 
-  pub fn checked_sub(self, other: U12) -> Option<U12> {
+  pub fn checked_sub(self, other: U12) -> Option<Self> {
     if other > self {
       None
     } else {
