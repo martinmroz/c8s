@@ -230,10 +230,19 @@ impl<'a> Instruction {
     }
 
     // Assemble the matched instruction.
-    match opcode {
+    return match opcode {
       Some(value) => Ok(Instruction(value)),
-      None => Err(format!("Unable to assemble instruction {} {:?}", mnemonic, fields))
-    }
+      None => {
+        match fields.len() {
+          0 => Err(format!("No matching format for instruction: {}", mnemonic)),
+          _ => {
+            let field_strings = fields.iter().map(|field| format!("{}", field));
+            let field_description = field_strings.collect::<Vec<_>>().connect(",");
+            Err(format!("No matching format for instruction: {} {}", mnemonic, field_description))
+          }
+        }
+      }
+    };
 	}
 }
 
@@ -263,10 +272,53 @@ impl Emittable for Instruction {
 #[cfg(test)]
 mod tests {
 
+  use std::collections::BTreeMap;
+
   use assembler::assembler::Emittable;
-  use assembler::parser::Literal;
+  use assembler::opcode::Opcode;
+  use assembler::parser::{InstructionField, Literal};
   use assembler::u12;
 
   use super::*;
+
+  #[test]
+  pub fn test_nop() {
+    let empty_map = BTreeMap::new();
+    let nop = Instruction::from_mnemonic_and_parameters("nop", vec![], &empty_map).unwrap();
+    assert_eq!(nop.size(), 2);
+    assert_eq!(nop.0, Opcode::NOP);
+  }
+
+  #[test]
+  pub fn test_cls() {
+    let empty_map = BTreeMap::new();
+    let cls = Instruction::from_mnemonic_and_parameters("cls", vec![], &empty_map).unwrap();
+    assert_eq!(cls.size(), 2);
+    assert_eq!(cls.0, Opcode::CLS);
+  }
+
+  #[test]
+  pub fn test_ret() {
+    let empty_map = BTreeMap::new();
+    let ret = Instruction::from_mnemonic_and_parameters("ret", vec![], &empty_map).unwrap();
+    assert_eq!(ret.size(), 2);
+    assert_eq!(ret.0, Opcode::RET);
+  }
+
+  #[test]
+  pub fn test_trapret() {
+    let empty_map = BTreeMap::new();
+    let trapret = Instruction::from_mnemonic_and_parameters("trapret", vec![], &empty_map).unwrap();
+    assert_eq!(trapret.size(), 2);
+    assert_eq!(trapret.0, Opcode::TRAPRET);
+  }
+
+  #[test]
+  pub fn test_trap() {
+    let empty_map = BTreeMap::new();
+    let trap = Instruction::from_mnemonic_and_parameters("trap", vec![], &empty_map).unwrap();
+    assert_eq!(trap.size(), 2);
+    assert_eq!(trap.0, Opcode::TRAP);
+  }
 
 }
