@@ -45,7 +45,7 @@ fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
       Ok(value)
     }
     _ => {
-      Err(format!("Found 12-bit numeric literal ${:X}, expecting 4-bit value.", literal.as_usize()))
+      Err(format!("Found 8/12-bit numeric literal ${:X}, expecting 4-bit value.", literal.as_usize()))
     }
   }
 }
@@ -638,7 +638,7 @@ mod tests {
     let immediate_field_invalid = InstructionField::NumericLiteral(U12::from(0x10));
     let invalid_drw = Instruction::from_mnemonic_and_parameters("drw", vec![register_field_1, register_field_2, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_drw.is_err(), true);
-    assert_eq!(invalid_drw.unwrap_err(), String::from("Found 12-bit numeric literal $10, expecting 4-bit value."));
+    assert_eq!(invalid_drw.unwrap_err(), String::from("Found 8/12-bit numeric literal $10, expecting 4-bit value."));
   }
 
   #[test]

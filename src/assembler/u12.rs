@@ -35,6 +35,15 @@ impl U12 {
     U12((self.0 + other.0) & 0xFFF)
   }
 
+  pub fn checked_add(self, other: U12) -> Option<Self> {
+    let sum: u16 = self.0 + other.0;
+    if sum > 0x0FFF {
+      None
+    } else {
+      Some(U12(sum))
+    }
+  }
+
   pub fn checked_sub(self, other: U12) -> Option<Self> {
     if other > self {
       None

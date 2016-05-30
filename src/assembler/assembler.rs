@@ -2,334 +2,33 @@
 use std::collections::BTreeMap;
 use std::mem;
 
+use assembler::data_range::DataRange;
+use assembler::directive::*;
+use assembler::instruction::*;
 use assembler::opcode::Opcode;
 use assembler::parser::{Literal, Node, InstructionField};
 use assembler::u12::*;
 
-// MARK: - Result Type
+// MARK: - Emittable
 
-#[derive(PartialEq, Debug)]
-pub struct DataRange {
-  /// The first address populated by the bytes in the range.
-  pub start_address: usize,
-  /// The bytes occupying the range.
-  pub data: Vec<u8>
-}
+pub trait Emittable {
 
-impl DataRange {
-  fn new(start_address: usize) -> Self {
-    assert!(start_address <= 0xFFF);
-    DataRange {
-      start_address: start_address,
-      data: Vec::new()
-    }
-  }
+  /**
+   @return The size of the emittable element in bytes.
+   */
+  fn size(&self) -> usize;
+
+  /**
+   Consuming conversion from an emittable element into an byte Vec.
+   @return A Vec of bytes to be written into the output stream.
+   */
+  fn into_slice(self) -> Vec<u8>;
+
 }
 
 // MARK: - Constants
 
-const BYTES_PER_INSTRUCTION: usize = 2;
-const DIRECTIVE_ORG: &'static str = "org";
-const DIRECTIVE_DB : &'static str = "db";
-
-// MARK: - Semantic Analysis
-
-/**
- @return () in the event the arguments are valid for the directive, or a failure reason.
- */
-fn validate_directive_semantics<'a>(identifier: &'a str, arguments: &Vec<Literal>) -> Result<(), String> {
-  /*
-   The 'org' directive is used to set the current output origin address. The directive requires
-   a single numeric literal in the range $000-$FFF.
-   */
-  if identifier == DIRECTIVE_ORG {
-    if arguments.len() != 1 {
-      return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1.", arguments.len()));
-    }
-    
-    match arguments[0] {
-      Literal::Numeric(a) if a <= 4095 => {} 
-      _ => {
-          return Err(format!("Directive .org requires 1 numeric literal in the range $000-$FFF."));
-      }
-    }
-
-    return Ok(());
-  }
-
-  /*
-   The 'db' directive is used to emit a series of bytes at the current location. 
-   A list of 1 or more literals is required, either numeric or string. 
-   A string literal is emitted without a null-terminator.
-   */
-  if identifier == DIRECTIVE_DB {
-    if arguments.len() == 0 {
-      return Err(format!("Incorrect number of parameters ({}) for directive .db, expecting 1 or more.", arguments.len()));
-    }
-
-    for argument in arguments {
-      if let &Literal::Numeric(value) = argument {
-          if value > 0xFF {
-              return Err(format!("All numeric parameters to .db must be 1-byte literals (${:X} > $FF)", value));
-          }
-      }
-    }
-
-    return Ok(());
-  }
-
-  Err(format!("Unrecognized directive .{}", identifier))
-}
-
-/**
- @return The number of bytes the directive represents within the output stream.
- */
-fn size_of_directive<'a>(identifier: &'a str, arguments: &Vec<Literal>) -> usize {
-  // The origin directive is not emitted.
-  if identifier == DIRECTIVE_ORG {
-    return 0;
-  }
-
-  // The number of bytes emitted by .db is the sum of argument lengths.
-  if identifier == DIRECTIVE_DB {
-    return arguments.iter().fold(0, |acc, argument| {
-      match *argument {
-        Literal::Numeric(number) if number <= 0xFF => { acc + 1 }
-        Literal::String(ref string) => { acc + string.len() }
-        _ => unreachable!()
-      }
-    });
-  }
-
-  // The first pass at semantic analysis should have caught an invalid directive.
-  panic!("Semantic analysis for directive .{} failed.", identifier);
-}
-
-/**
- Resolves the label from the label map.
- @param label The name of the label (case-sensitive).
- @param label_map The mapping of labels to their resolved addresses.
- @return The address from the label map if defined, or an error describing the failure.
- */
-fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, usize>) -> Result<U12, String> {
-  match label_map.get(label) {
-    Some(value) => Ok(value.as_u12().unwrap()),
-           None => Err(format!("Unable to resolve address of label {}", label))
-  }
-}
-
-/**
- Converts a 12-bit (unsigned) literal value to 8-bits if possible to do so without data loss.
- @param literal 12-bit literal.
- @return A result consisting of the low 8 bits of the 12-bit literal or an explanation as to why conversion failed.
- */
-fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
-  match literal.as_u8() {
-    Some(value) => Ok(value),
-           None => Err(format!("Found 12-bit numeric literal ${:X}, expecting 8-bit value.", literal.as_usize()))
-  }
-}
-
-/**
- Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
- label resolution map). Produces an error message in the event of failure.
- @param mnemonic The (all lowercase) instruction mnemonic.
- @param fields A vector of instruction fields.
- @param label_map A reference to a map of labels to their defined address values.
- @return The assembled instruction if successful or a string describing the failure otherwise.
- */
-fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, usize>) -> Result<u16, String> {
-  let mut opcode: Option<Opcode> = None;
-
-  // Mnemonics with zero parameters.
-  if fields.len() == 0 {
-    opcode = match mnemonic {
-      "nop"     => Some(Opcode::NOP),
-      "cls"     => Some(Opcode::CLS),
-      "ret"     => Some(Opcode::RET),
-      "trap"    => Some(Opcode::TRAP),
-      "trapret" => Some(Opcode::TRAPRET),
-      _         => None
-    };
-  }
-
-  // Mnemonics with one parameter.
-  if fields.len() == 1 {
-    opcode = match (mnemonic, fields.get(0).unwrap()) {
-
-      ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target }),
-
-      // The 'jp' mnemonic may reference a label.
-      ("jp", &InstructionField::Identifier(label)) => {
-        let address = try!(resolve_label_with_map(label, label_map));
-        Some(Opcode::JP { target: address })
-      }
-
-      ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target }),
-
-      // The 'call' mnemonic may reference a label.
-      ("call", &InstructionField::Identifier(label)) => {
-        let address = try!(resolve_label_with_map(label, label_map));
-        Some(Opcode::CALL { target: address })
-      }
-
-      _ => None
-    }
-  }
-
-  // Mnemonics with two parameters.
-  if fields.len() == 2 {
-    opcode = match (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap()) {
-      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::SE_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
-      }
-
-      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::SNE_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
-      }
-
-      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SE_REGISTER { register_x: x, register_y: y })
-      }
-
-      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SNE_REGISTER { register_x: x, register_y: y })
-      }
-
-      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::LD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
-      }
-
-      ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::ADD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
-      }
-
-      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::LD_REGISTER { register_x: x, register_y: y })
-      }
-
-      ("or", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::OR { register_x: x, register_y: y })
-      }
-
-      ("and", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::AND { register_x: x, register_y: y })
-      }
-
-      ("xor", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::XOR { register_x: x, register_y: y })
-      }
-
-      ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::ADD_REGISTER { register_x: x, register_y: y })
-      }
-
-      ("sub", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SUB { register_x: x, register_y: y })
-      }
-
-      ("shr", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SHR { register_x: x, register_y: y })
-      }
-
-      ("subn", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SUBN { register_x: x, register_y: y })
-      }
-
-      ("shl", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-        Some(Opcode::SHL { register_x: x, register_y: y })
-      }
-
-      ("ld", &InstructionField::IndexRegister, &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::LD_I { value: value })
-      }
-
-      // The mnemonic 'ld i' can take a label parameter.
-      ("ld", &InstructionField::IndexRegister, &InstructionField::Identifier(label)) => {
-        let address = try!(resolve_label_with_map(label, label_map));
-        Some(Opcode::LD_I { value: address })
-      }
-
-      ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::JP_V0 { value: value })
-      }
-
-      // The mnemonic 'jp v0' can take a label parameter.
-      ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::Identifier(label)) => {
-        let address = try!(resolve_label_with_map(label, label_map));
-        Some(Opcode::JP_V0 { value: address })
-      }
-
-      ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
-        Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(value)) })
-      }
-
-      ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
-        Some(Opcode::SE_K { register_x: x })
-      }
-
-      ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
-        Some(Opcode::SNE_K { register_x: x })
-      }
-
-      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::DelayTimer) => {
-        Some(Opcode::LD_X_DT { register_x: x })
-      }
-
-      ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
-        Some(Opcode::LD_X_K { register_x: x })
-      }
-
-      ("ld", &InstructionField::DelayTimer, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::LD_DT_X { register_x: x })
-      }
-
-      ("ld", &InstructionField::SoundTimer, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::LD_ST_X { register_x: x })
-      }
-
-      ("add", &InstructionField::IndexRegister, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::ADD_I_X { register_x: x })
-      }
-
-      ("sprite", &InstructionField::IndexRegister, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::SPRITE_I { register_x: x })
-      }
-
-      ("bcd", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::BCD_I { register_x: x })
-      }
-
-      ("save", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::SAVE_I { register_x: x })
-      }
-
-      ("restore", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
-        Some(Opcode::RESTORE_I { register_x: x })
-      }
-
-      _ => None
-    };
-  }
-
-  // Mnemonics with three parameter.
-  if fields.len() == 3 {
-    let tuple = (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap(), fields.get(2).unwrap());
-    if let (
-      "drw", 
-      &InstructionField::GeneralPurposeRegister(x), 
-      &InstructionField::GeneralPurposeRegister(y),
-      &InstructionField::NumericLiteral(value)) = tuple {
-      opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_8_bit_field(value)) } );
-    }
-  }
-
-  // Assemble the matched instruction.
-  match opcode {
-    None => Err(format!("Unable to assemble instruction {} {:?}", mnemonic, fields)),
-    Some(value) => Ok(value.as_instruction())
-  }
-}
+const BYTES_PER_INSTRUCTION: u8 = 2;
 
 // MARK: - Pass 1: Define Labels
 
@@ -338,26 +37,34 @@ fn assemble_instruction<'a>(mnemonic: &'a str, fields: Vec<InstructionField<'a>>
  declared in the assembly. This involves walking the ASL, computing the size of instructions
  and directives in the output stream and using that information to establish the label-address map.
  @param syntax_list The un-filtered syntax list.
- @return A tuple of (the filtered syntax list with all labels removed,
-     the map of labels to their corresponding addresses) on success or a string describing
+ @return The map of labels to their corresponding addresses on success or a string describing
      the reason the first pass failed.
  */
-fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, usize>, String> {
+fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U12>, String> {
   let mut label_address_map = BTreeMap::new();
-  let mut current_address = 0x000;
+  let mut current_address = U12::zero();
 
   // Define all labels and process '.org' directives.
   for node in syntax_list.iter() {
     match *node {
       Node::Directive(ref data) => {
         // Validate the directive and that the arguments match the identifier.
-        try!(validate_directive_semantics(data.identifier, &data.arguments));
+        let directive = try!(Directive::from_identifier_and_parameters(data.identifier, &data.arguments));
 
-        // Adjust address by directive size.
-        current_address = current_address + size_of_directive(data.identifier, &data.arguments);
+        // Ensure the directive is not too large to emit.
+        let directive_size = match directive.size().as_u12() {
+                None => { return Err(format!("Directive too large.")); }
+          Some(size) => { size }
+        };
+
+        // Offset the current address by the size of the directive being processed.
+        current_address = match current_address.checked_add(directive_size) {
+                None => { return Err(format!("Directive would cause address counter to overflow.")); }
+           Some(sum) => { sum }
+        };
 
         // The origin directive changes the current address.
-        if let (DIRECTIVE_ORG, &Literal::Numeric(address)) = (data.identifier, &data.arguments[0]) {
+        if let Directive::Org(address) = directive {
           current_address = address;
         }
       }
@@ -373,7 +80,10 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, us
 
       Node::Instruction(_) => {
         // All Chip8 instructions are the same length.
-        current_address = current_address + BYTES_PER_INSTRUCTION;
+        current_address = match current_address.checked_add(U12::from(BYTES_PER_INSTRUCTION)) {
+                None => { return Err(format!("Instruction would cause address counter to overflow.")); }
+           Some(sum) => { sum }
+        };
       }
     }
   }
@@ -382,247 +92,11 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, us
   Ok(label_address_map)
 }
 
-// MARK: - Pass 2: Emit Bytes
-
-fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, usize>) -> Result<Vec<DataRange>, String> {
-  let mut data_ranges = Vec::new();
-  let mut current_range = DataRange::new(0x000);
-
-  for node in syntax_list {
-    match node {
-      Node::Directive(data) => {
-        match data.identifier {
-          DIRECTIVE_ORG => {
-            // Push the current data range into the list of ranges and start a new one at the 'org' point.
-            if let Some(&Literal::Numeric(address)) = data.arguments.get(0) {
-              let new_range = DataRange::new(address);
-              let previous_range = mem::replace(&mut current_range, new_range);
-              data_ranges.push(previous_range);
-            } else {
-              panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", data.identifier);
-            }
-          }
-
-          DIRECTIVE_DB  => {
-            // Emit all the literal arguments directly to the data range.
-            for literal in data.arguments {
-              match literal {
-                Literal::Numeric(numeric) => {
-                  assert!(numeric <= 0xFF);
-                  current_range.data.push(numeric as u8);
-                }
-                Literal::String(string) => {
-                  current_range.data.extend_from_slice(string.as_bytes());
-                }
-              }
-            }
-          }
-
-          id @ _ => {
-            panic!("Internal assembler error: Invalid directive {} not removed prior to emit_data_ranges().", id);
-          }
-        }
-      }
-
-      Node::Instruction(data) => {
-        // Verify the semantics and append the instruction to the output buffer.
-        let instruction_word = try!(assemble_instruction(data.mnemonic, data.fields, label_address_map));
-        let hi_8 = ((instruction_word & 0xFF00) >> 8) as u8;
-        let lo_8 = ((instruction_word & 0x00FF) >> 8) as u8;
-        current_range.data.push(hi_8);
-        current_range.data.push(lo_8);
-      }
-
-      Node::Label(_) => {
-        // Processed in Pass 1.
-      }
-    }
-  }
-
-  // Push the last range into the list.
-  data_ranges.push(current_range);
-  Ok(data_ranges)
-}
-
 // MARK: - Public API
 
 /**
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-    let label_address_map = try!(define_labels(&syntax_list));
-    emit_data_ranges(syntax_list, &label_address_map)
-}
-
-// MARK: - Tests
-
-#[cfg(test)]
-mod tests {
-  
-  use assembler::parser::*;
-  use assembler::source_file_location::SourceFileLocation;
-
-  use super::{validate_directive_semantics, size_of_directive};
-  use super::define_labels;
-
-  // MARK: - Helpers
-
-  /// Creates a Label type node with associated data at location "-:seq:1-name.len()".
-  fn make_label_node<'a>(seq: usize, name: &'a str) -> Node<'a> {
-    Node::Label (
-      LabelData {
-        location: SourceFileLocation::new("-", seq, 1, name.len()),
-        identifier: name
-      }
-    )
-  }
-
-  /// Creates a Directive type node with associated data at location "-:seq:2-name.len()+1".
-  fn make_directive_node<'a>(seq: usize, name: &'a str, args: Vec<Literal<'a>>) -> Node<'a> {
-    Node::Directive (
-      DirectiveData {
-        location: SourceFileLocation::new("-", seq, 2, name.len()),
-        identifier: name,
-        arguments: args
-      }
-    )
-  }
-
-  /// Creates an Instruction type node with associated data at location "-:seq:1-name.len()".
-  fn make_instruction_node<'a>(seq: usize, name: &'a str, fields: Vec<InstructionField<'a>>) -> Node<'a> {
-    Node::Instruction (
-      InstructionData {
-        location: SourceFileLocation::new("-", seq, 1, name.len()),
-        mnemonic: name,
-        fields: fields
-      }
-    )
-  }
-
-  // MARK: - Pass 1 Tests
-
-  #[test]
-  fn test_validate_directive_semantics_for_org() {
-    let mut params = vec![];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
-    params = vec![Literal::Numeric(1), Literal::Numeric(3)];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Incorrect number of parameters (2) for directive .org, expecting 1.".to_string()));
-    params = vec![Literal::Numeric(0x1000)];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
-    params = vec![Literal::String("TEST_STRING")];
-    assert_eq!(validate_directive_semantics("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
-    params = vec![Literal::Numeric(0xFFF)];
-    assert_eq!(validate_directive_semantics("org", &params), Ok(()));
-    params = vec![Literal::Numeric(0x000)];
-    assert_eq!(validate_directive_semantics("org", &params), Ok(()));
-  }
-
-  #[test]
-  fn test_validate_directive_semantics_for_db() {
-    let mut params = vec![];
-    assert_eq!(validate_directive_semantics("db", &params), Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
-    params = vec![Literal::Numeric(0x100)];
-    assert_eq!(validate_directive_semantics("db", &params), Err("All numeric parameters to .db must be 1-byte literals ($100 > $FF)".to_string()));
-    params = vec![Literal::String("TEST_STRING")];
-    assert_eq!(validate_directive_semantics("db", &params), Ok(()));
-    params = vec![Literal::Numeric(0xFF)];
-    assert_eq!(validate_directive_semantics("db", &params), Ok(()));
-    params = vec![Literal::Numeric(0x00)];
-    assert_eq!(validate_directive_semantics("db", &params), Ok(()));
-    params = vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)];
-    assert_eq!(validate_directive_semantics("db", &params), Ok(()));
-  }
-
-  #[test]
-  fn test_validate_directive_semantics_for_invalid_directive() {
-    let mut params = vec![];
-    assert_eq!(validate_directive_semantics("dw", &params), Err("Unrecognized directive .dw".to_string()));
-    params = vec![Literal::Numeric(0x100)];
-    assert_eq!(validate_directive_semantics("dw", &params), Err("Unrecognized directive .dw".to_string()));
-  }
-
-  #[test]
-  fn test_size_of_directive_for_org() {
-    assert_eq!(size_of_directive("org", &vec![]), 0);
-    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100)]), 0);
-    assert_eq!(size_of_directive("org", &vec![Literal::Numeric(0x100), Literal::String("TEST_STRING")]), 0);
-  }
-
-  #[test]
-  fn test_size_of_directive_for_db() {
-    assert_eq!(size_of_directive("db", &vec![]), 0);
-    assert_eq!(size_of_directive("db", &vec![Literal::Numeric(0xFF)]), 1);
-    assert_eq!(size_of_directive("db", &vec![Literal::String("TEST_STRING")]), 11);
-    assert_eq!(size_of_directive("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]), 12);
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_size_of_directive_panics_for_invalid_directive() {
-    size_of_directive("dw", &vec![]);
-  }
-
-  #[test]
-  fn test_define_labels() {
-    let program = vec![
-      make_directive_node   (1, "org", vec![Literal::Numeric(0x100)]),
-      make_label_node       (2, "label1"),
-      make_directive_node   (3, "db", vec![Literal::Numeric(0xFF)]),
-      make_label_node       (4, "label2"),
-      make_instruction_node (5, "trap", vec![]),
-      make_label_node       (6, "label3"),
-    ];
-
-    let result = define_labels(&program);
-
-    // Assert that semantic analysis passed.
-    if let Err(reason) = result {
-      assert!(false, "Unexpected failure in assembler pass 1: {}", reason);
-      return;
-    }
-
-    // Verify that the 
-    if let Ok(label_map) = result {
-      assert_eq!(label_map.len(), 3);
-      assert_eq!(label_map.get("label1").unwrap(), &0x100);
-      assert_eq!(label_map.get("label2").unwrap(), &0x101);
-      assert_eq!(label_map.get("label3").unwrap(), &0x103);
-    }
-  }
-
-  #[test]
-  fn test_define_labels_does_semantic_analysis_on_org() {
-    let program = vec![
-      make_directive_node(1, "org", vec![])
-    ];
-
-    let result = define_labels(&program);
-    assert_eq!(result, Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
-  }
-
-  #[test]
-  fn test_define_labels_does_semantic_analysis_on_db() {
-    let program = vec![
-      make_directive_node(1, "db", vec![])
-    ];
-
-    let result = define_labels(&program);
-    assert_eq!(result, Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
-  }
-
-  #[test]
-  fn test_define_labels_fails_on_redefinition() {
-    let program = vec![
-      make_label_node(1, "L1"),
-      make_label_node(2, "L1"),
-    ];
-
-    let result = define_labels(&program);
-    assert_eq!(result, Err("Attempted re-definition of label L1.".to_string()));
-  }
-
-  // MARK: - Pass 2 Tests
-
-
-
+    Err(String::from("Mission failed."))
 }
