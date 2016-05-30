@@ -34,6 +34,20 @@ fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
   }
 }
 
+/**
+ Converts a 12-bit (unsigned) literal value to 4-bits if possible to do so without data loss.
+ @param literal 12-bit literal.
+ @return A result consisting of the low 4 bits of the 12-bit literal or an explanation as to why conversion failed.
+ */
+fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
+  match literal.as_u8() {
+    Some(value) if value < 16 => Ok(value),
+    _ => {
+      Err(format!("Found 12-bit numeric literal ${:X}, expecting 4-bit value.", literal.as_usize()))
+    }
+  }
+}
+
 impl<'a> Instruction {
 	/**
 	 Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
@@ -225,7 +239,7 @@ impl<'a> Instruction {
         &InstructionField::GeneralPurposeRegister(x), 
         &InstructionField::GeneralPurposeRegister(y),
         &InstructionField::NumericLiteral(value)) = tuple {
-        opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_8_bit_field(value)) } );
+        opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_4_bit_field(value)) } );
       }
     }
 
@@ -283,7 +297,7 @@ mod tests {
   use super::*;
 
   #[test]
-  pub fn test_nop() {
+  fn test_nop() {
     let empty_map = BTreeMap::new();
     let nop = Instruction::from_mnemonic_and_parameters("nop", vec![], &empty_map).unwrap();
     assert_eq!(nop.size(), 2);
@@ -291,7 +305,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_cls() {
+  fn test_cls() {
     let empty_map = BTreeMap::new();
     let cls = Instruction::from_mnemonic_and_parameters("cls", vec![], &empty_map).unwrap();
     assert_eq!(cls.size(), 2);
@@ -299,7 +313,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_ret() {
+  fn test_ret() {
     let empty_map = BTreeMap::new();
     let ret = Instruction::from_mnemonic_and_parameters("ret", vec![], &empty_map).unwrap();
     assert_eq!(ret.size(), 2);
@@ -307,7 +321,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_trapret() {
+  fn test_trapret() {
     let empty_map = BTreeMap::new();
     let trapret = Instruction::from_mnemonic_and_parameters("trapret", vec![], &empty_map).unwrap();
     assert_eq!(trapret.size(), 2);
@@ -315,7 +329,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_trap() {
+  fn test_trap() {
     let empty_map = BTreeMap::new();
     let trap = Instruction::from_mnemonic_and_parameters("trap", vec![], &empty_map).unwrap();
     assert_eq!(trap.size(), 2);
@@ -323,7 +337,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_jp() {
+  fn test_jp() {
     let empty_map = BTreeMap::new();
     let mut defined_map = BTreeMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
@@ -352,7 +366,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_call() {
+  fn test_call() {
     let empty_map = BTreeMap::new();
     let mut defined_map = BTreeMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
@@ -381,7 +395,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_se_immediate_and_register() {
+  fn test_se_immediate_and_register() {
     let empty_map = BTreeMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
@@ -405,7 +419,7 @@ mod tests {
   }
 
   #[test]
-  pub fn test_sne_immediate_and_register() {
+  fn test_sne_immediate_and_register() {
     let empty_map = BTreeMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
@@ -426,6 +440,60 @@ mod tests {
     let invalid_sne_imm = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_sne_imm.is_err(), true);
     assert_eq!(invalid_sne_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+  }
+
+  #[test]
+  fn test_ld_immediate_and_register() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+
+    // Load vX := vY.
+    let ld_rr = Instruction::from_mnemonic_and_parameters("ld", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(ld_rr.size(), 2);
+    assert_eq!(ld_rr.0, Opcode::LD_REGISTER { register_x: 1, register_y: 2 });
+
+    // Load vX := imm8.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xFF));
+    let ld_imm = Instruction::from_mnemonic_and_parameters("ld", vec![register_field_1, immediate_field], &empty_map).unwrap();
+    assert_eq!(ld_imm.size(), 2);
+    assert_eq!(ld_imm.0, Opcode::LD_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Immediate fields for ld vX, $nn is limited to 8 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let invalid_ld_imm = Instruction::from_mnemonic_and_parameters("ld", vec![register_field_1, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_ld_imm.is_err(), true);
+    assert_eq!(invalid_ld_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+  }
+
+  #[test]
+  fn test_add_immediate_and_register_and_index() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+    let index_register_field = InstructionField::IndexRegister;
+
+    // Add vX += vY.
+    let add_rr = Instruction::from_mnemonic_and_parameters("add", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(add_rr.size(), 2);
+    assert_eq!(add_rr.0, Opcode::ADD_REGISTER { register_x: 1, register_y: 2 });
+
+    // Add vX += imm8.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xFF));
+    let add_imm = Instruction::from_mnemonic_and_parameters("add", vec![register_field_1, immediate_field], &empty_map).unwrap();
+    assert_eq!(add_imm.size(), 2);
+    assert_eq!(add_imm.0, Opcode::ADD_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Immediate fields for add vX, $nn is limited to 8 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let invalid_add_imm = Instruction::from_mnemonic_and_parameters("add", vec![register_field_1, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_add_imm.is_err(), true);
+    assert_eq!(invalid_add_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+
+    // Add I += vX.
+    let add_i = Instruction::from_mnemonic_and_parameters("add", vec![index_register_field, register_field_2], &empty_map).unwrap();
+    assert_eq!(add_i.size(), 2);
+    assert_eq!(add_i.0, Opcode::ADD_I_X { register_x: 2 });
   }
 
 }
