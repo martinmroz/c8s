@@ -125,7 +125,6 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
         }
       }
 
-
       Node::Instruction(data) => {
         // Verify the semantics and append the instruction to the output buffer.
         match Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map) {
@@ -146,7 +145,10 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
   }
 
   // Push the last range into the list.
-  data_ranges.push(current_range);
+  if current_range.len() > 0 {
+    data_ranges.push(current_range);
+  }
+
   Ok(data_ranges)
 }
 
