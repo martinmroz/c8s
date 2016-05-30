@@ -1,6 +1,7 @@
 
 pub mod assembler;
 pub mod data_range;
+pub mod directive;
 pub mod opcode;
 pub mod parser;
 pub mod scanner;
