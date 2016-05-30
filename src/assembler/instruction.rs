@@ -712,7 +712,7 @@ mod tests {
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
 
-    // Save [i], vX.
+    // Restore vX. [i].
     let restore_i = Instruction::from_mnemonic_and_parameters("restore", vec![register_field, index_register_indirect_field], &empty_map).unwrap();
     assert_eq!(restore_i.size(), 2);
     assert_eq!(restore_i.0, Opcode::RESTORE_I { register_x: 7 });
