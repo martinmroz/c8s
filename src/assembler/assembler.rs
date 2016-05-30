@@ -22,7 +22,7 @@ pub trait Emittable {
    Consuming conversion from an emittable element into an byte Vec.
    @return A Vec of bytes to be written into the output stream.
    */
-  fn into_slice(self) -> Vec<u8>;
+  fn into_vec(self) -> Vec<u8>;
 
 }
 
@@ -111,6 +111,60 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
   // Semantic analysis for directives and labels is complete.
   Ok(label_address_map)
+}
+
+// MARK: - Pass 2: Emit Bytes
+
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, U12>) -> Result<Vec<DataRange>, String> {
+  let mut data_ranges = Vec::new();
+  let mut current_range = DataRange::new(U12::zero());
+
+  for node in syntax_list {
+    match node {
+
+      Node::Directive(data) => {
+        match Directive::from_identifier_and_parameters(data.identifier, &data.arguments).unwrap() {
+
+          // Process the origin directive to build a new data range.
+          Directive::Org(address) => {
+            let new_range = DataRange::new(address);
+            let previous_range = mem::replace(&mut current_range, new_range);
+            if previous_range.len() > 0 {
+              data_ranges.push(previous_range);
+            }
+          }
+
+          // Emit the directive into the range.
+          directive @ _ => {
+            assert_eq!(current_range.append(directive.into_vec().as_slice()), true);
+          }
+
+        }
+      }
+
+
+      Node::Instruction(data) => {
+        // Verify the semantics and append the instruction to the output buffer.
+        match Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map) {
+          Ok(instruction) => {
+            assert_eq!(current_range.append(instruction.into_vec().as_slice()), true);
+          }
+          Err(reason) => {
+            return Err(format_semantic_error(&data.location, reason));
+          }
+        }
+      }
+
+      Node::Label(_) => { 
+        // Processed in Pass 1. 
+      }
+
+    }
+  }
+
+  // Push the last range into the list.
+  data_ranges.push(current_range);
+  Ok(data_ranges)
 }
 
 // MARK: - Public API

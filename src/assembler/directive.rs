@@ -107,7 +107,7 @@ impl Emittable for Directive {
    Consuming conversion from a directive element into the byte representation in the output stream.
    @return A Vec of bytes to be written into the output stream for the directive.
    */
-  fn into_slice(self) -> Vec<u8> {
+  fn into_vec(self) -> Vec<u8> {
     match self {
       Directive::Org(_)       => Vec::new(),
       Directive::Db(data)     => data
