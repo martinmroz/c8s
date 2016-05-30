@@ -36,7 +36,7 @@ impl<'a> Directive {
       }
 
       return match arguments[0] {
-        Literal::Numeric(a) if a <= 4095 => {
+        Literal::Numeric(a) if a <= 0xFFF => {
           Ok(Directive::Org(a.as_u12().unwrap()))
         }
         _ => {

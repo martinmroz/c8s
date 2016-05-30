@@ -109,14 +109,14 @@ impl Opcode {
       Opcode::RET                                                     => { format!("ret") }
       Opcode::TRAP                                                    => { format!("trap") }
       Opcode::TRAPRET                                                 => { format!("trapret") }
-      Opcode::JP              { target }                              => { format!("jp 0x{:3x}", target.as_u16()) }
-      Opcode::CALL            { target }                              => { format!("call 0x{:3x}", target.as_u16()) }
-      Opcode::SE_IMMEDIATE    { register_x: x, value }                => { format!("se v{:1x}, 0x{:2x}", x, value) }
-      Opcode::SNE_IMMEDIATE   { register_x: x, value }                => { format!("sne v{:1x}, 0x{:2x}", x, value) }
+      Opcode::JP              { target }                              => { format!("jp ${:3x}", target.as_u16()) }
+      Opcode::CALL            { target }                              => { format!("call ${:3x}", target.as_u16()) }
+      Opcode::SE_IMMEDIATE    { register_x: x, value }                => { format!("se v{:1x}, ${:2x}", x, value) }
+      Opcode::SNE_IMMEDIATE   { register_x: x, value }                => { format!("sne v{:1x}, ${:2x}", x, value) }
       Opcode::SE_REGISTER     { register_x: x, register_y: y }        => { format!("se v{:1x}, v{:1x}", x, y) }
       Opcode::SNE_REGISTER    { register_x: x, register_y: y }        => { format!("sne v{:1x}, v{:1x}", x, y) }
-      Opcode::LD_IMMEDIATE    { register_x: x, value }                => { format!("ld v{:1x}, 0x{:2x}", x, value) }
-      Opcode::ADD_IMMEDIATE   { register_x: x, value }                => { format!("add v{:1x}, 0x{:2x}", x, value) }
+      Opcode::LD_IMMEDIATE    { register_x: x, value }                => { format!("ld v{:1x}, ${:2x}", x, value) }
+      Opcode::ADD_IMMEDIATE   { register_x: x, value }                => { format!("add v{:1x}, ${:2x}", x, value) }
       Opcode::LD_REGISTER     { register_x: x, register_y: y }        => { format!("ld v{:1x}, v{:1x}", x, y) }
       Opcode::OR              { register_x: x, register_y: y }        => { format!("or v{:1x}, v{:1x}", x, y) }
       Opcode::AND             { register_x: x, register_y: y }        => { format!("and v{:1x}, v{:1x}", x, y) }
@@ -126,10 +126,10 @@ impl Opcode {
       Opcode::SHR             { register_x: x, register_y: y }        => { format!("shr v{:1x}, v{:1x}", x, y) }
       Opcode::SUBN            { register_x: x, register_y: y }        => { format!("subn v{:1x}, v{:1x}", x, y) }
       Opcode::SHL             { register_x: x, register_y: y }        => { format!("shl v{:1x}, v{:1x}", x, y) }
-      Opcode::LD_I            { value }                               => { format!("ld i, 0x{:3x}", value.as_u16()) }
-      Opcode::JP_V0           { value }                               => { format!("jp v0, 0x{:3x}", value.as_u16()) }
-      Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, 0x{:2x}", x, mask) }
-      Opcode::DRW             { register_x: x, register_y: y, bytes}  => { format!("drw v{:1x}, v{:1x}, 0x{:1x}", x, y, bytes) }
+      Opcode::LD_I            { value }                               => { format!("ld i, ${:3x}", value.as_u16()) }
+      Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", value.as_u16()) }
+      Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, ${:2x}", x, mask) }
+      Opcode::DRW             { register_x: x, register_y: y, bytes}  => { format!("drw v{:1x}, v{:1x}, ${:1x}", x, y, bytes) }
       Opcode::SE_K            { register_x: x }                       => { format!("se v{:1x}, k", x) }
       Opcode::SNE_K           { register_x: x }                       => { format!("sne v{:1x}, k", x) }
       Opcode::LD_X_DT         { register_x: x }                       => { format!("ld v{:1x}, dt", x) }
@@ -314,13 +314,13 @@ mod tests {
       "ret",
       "trapret",
       "trap",
-      "jp 0x456",
-      "call 0x789",
-      "se v1, 0xde",
-      "sne v2, 0xef",
+      "jp $456",
+      "call $789",
+      "se v1, $de",
+      "sne v2, $ef",
       "se v5, v6",
-      "ld v1, 0x55",
-      "add v2, 0x66",
+      "ld v1, $55",
+      "add v2, $66",
       "ld v3, v4",
       "or v5, v6",
       "and v5, v6",
@@ -331,10 +331,10 @@ mod tests {
       "subn v5, v6",
       "shl v5, v6",
       "sne ve, vf",
-      "ld i, 0xdef",
-      "jp v0, 0x234",
-      "rnd v1, 0x8f",
-      "drw v2, v3, 0x4",
+      "ld i, $def",
+      "jp v0, $234",
+      "rnd v1, $8f",
+      "drw v2, v3, $4",
       "se v1, k",
       "sne v1, k",
       "ld v2, dt",
