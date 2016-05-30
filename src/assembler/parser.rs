@@ -19,7 +19,7 @@ pub enum Node<'a> {
   Instruction(InstructionData<'a>)
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Literal<'a> {
   /// A literal string value.
   String(&'a str),
@@ -45,7 +45,7 @@ pub struct LabelData<'a> {
   pub identifier: &'a str
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum InstructionField<'a> {
   /// A numeric literal value.
   NumericLiteral(U12),

@@ -278,6 +278,7 @@ mod tests {
   use assembler::opcode::Opcode;
   use assembler::parser::{InstructionField, Literal};
   use assembler::u12;
+  use assembler::u12::*;
 
   use super::*;
 
@@ -319,6 +320,35 @@ mod tests {
     let trap = Instruction::from_mnemonic_and_parameters("trap", vec![], &empty_map).unwrap();
     assert_eq!(trap.size(), 2);
     assert_eq!(trap.0, Opcode::TRAP);
+  }
+
+  #[test]
+  pub fn test_jp() {
+    let empty_map = BTreeMap::new();
+    let mut defined_map = BTreeMap::new();
+    defined_map.insert("TEST_LABEL", u12::MAX);
+
+    // Failure Mode 1: No Parameters.
+    let invalid_jp = Instruction::from_mnemonic_and_parameters("jp", vec![], &empty_map);
+    assert_eq!(invalid_jp.is_err(), true);
+    assert_eq!(invalid_jp.unwrap_err(), String::from("No matching format for instruction: jp"));
+
+    // Failure Mode 2: Undefined Label.
+    let label_field = InstructionField::Identifier("TEST_LABEL");
+    let invalid_jp = Instruction::from_mnemonic_and_parameters("jp", vec![label_field.clone()], &empty_map);
+    assert_eq!(invalid_jp.is_err(), true);
+    assert_eq!(invalid_jp.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
+
+    // Success 1: Literal 12-bit Numeric.
+    let literal_field = InstructionField::NumericLiteral(u12::MAX);
+    let jp_literal = Instruction::from_mnemonic_and_parameters("jp", vec![literal_field], &empty_map).unwrap();
+    assert_eq!(jp_literal.size(), 2);
+    assert_eq!(jp_literal.0, Opcode::JP { target: u12::MAX });
+
+    // Success 2: Defined 12-bit Label.
+    let jp_label = Instruction::from_mnemonic_and_parameters("jp", vec![label_field], &defined_map).unwrap();
+    assert_eq!(jp_label.size(), 2);
+    assert_eq!(jp_label.0, Opcode::JP { target: u12::MAX });
   }
 
 }
