@@ -162,111 +162,109 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String
 
 // MARK: - Tests
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
   
-//   use assembler::parser::*;
-//   use assembler::source_file_location::SourceFileLocation;
+  use assembler::parser::*;
+  use assembler::source_file_location::SourceFileLocation;
+  use assembler::u12::*;
 
-//   use super::{validate_directive_semantics, size_of_directive};
-//   use super::define_labels;
+  use super::define_labels;
 
-//   // MARK: - Helpers
+  // MARK: - Helpers
 
-//   /// Creates a Label type node with associated data at location "-:seq:1-name.len()".
-//   fn make_label_node<'a>(seq: usize, name: &'a str) -> Node<'a> {
-//     Node::Label (
-//       LabelData {
-//         location: SourceFileLocation::new("-", seq, 1, name.len()),
-//         identifier: name
-//       }
-//     )
-//   }
+  /// Creates a Label type node with associated data at location "-:seq:1-name.len()".
+  fn make_label_node<'a>(seq: usize, name: &'a str) -> Node<'a> {
+    Node::Label (
+      LabelData {
+        location: SourceFileLocation::new("-", seq, 1, name.len()),
+        identifier: name
+      }
+    )
+  }
 
-//   /// Creates a Directive type node with associated data at location "-:seq:2-name.len()+1".
-//   fn make_directive_node<'a>(seq: usize, name: &'a str, args: Vec<Literal<'a>>) -> Node<'a> {
-//     Node::Directive (
-//       DirectiveData {
-//         location: SourceFileLocation::new("-", seq, 2, name.len()),
-//         identifier: name,
-//         arguments: args
-//       }
-//     )
-//   }
+  /// Creates a Directive type node with associated data at location "-:seq:2-name.len()+1".
+  fn make_directive_node<'a>(seq: usize, name: &'a str, args: Vec<Literal<'a>>) -> Node<'a> {
+    Node::Directive (
+      DirectiveData {
+        location: SourceFileLocation::new("-", seq, 2, name.len()),
+        identifier: name,
+        arguments: args
+      }
+    )
+  }
 
-//   /// Creates an Instruction type node with associated data at location "-:seq:1-name.len()".
-//   fn make_instruction_node<'a>(seq: usize, name: &'a str, fields: Vec<InstructionField<'a>>) -> Node<'a> {
-//     Node::Instruction (
-//       InstructionData {
-//         location: SourceFileLocation::new("-", seq, 1, name.len()),
-//         mnemonic: name,
-//         fields: fields
-//       }
-//     )
-//   }
+  /// Creates an Instruction type node with associated data at location "-:seq:1-name.len()".
+  fn make_instruction_node<'a>(seq: usize, name: &'a str, fields: Vec<InstructionField<'a>>) -> Node<'a> {
+    Node::Instruction (
+      InstructionData {
+        location: SourceFileLocation::new("-", seq, 1, name.len()),
+        mnemonic: name,
+        fields: fields
+      }
+    )
+  }
 
-//   // MARK: - Pass 1 Tests
+  // MARK: - Pass 1 Tests
 
-//   #[test]
-//   fn test_define_labels() {
-//     let program = vec![
-//       make_directive_node   (1, "org", vec![Literal::Numeric(0x100)]),
-//       make_label_node       (2, "label1"),
-//       make_directive_node   (3, "db", vec![Literal::Numeric(0xFF)]),
-//       make_label_node       (4, "label2"),
-//       make_instruction_node (5, "trap", vec![]),
-//       make_label_node       (6, "label3"),
-//     ];
+  #[test]
+  fn test_define_labels() {
+    let program = vec![
+      make_directive_node   (1, "org", vec![Literal::Numeric(0x100)]),
+      make_label_node       (2, "label1"),
+      make_directive_node   (3, "db", vec![Literal::Numeric(0xFF)]),
+      make_label_node       (4, "label2"),
+      make_instruction_node (5, "trap", vec![]),
+      make_label_node       (6, "label3"),
+    ];
 
-//     let result = define_labels(&program);
+    let result = define_labels(&program);
 
-//     // Assert that semantic analysis passed.
-//     if let Err(reason) = result {
-//       assert!(false, "Unexpected failure in assembler pass 1: {}", reason);
-//       return;
-//     }
+    // Assert that semantic analysis passed.
+    if let Err(reason) = result {
+      assert!(false, "Unexpected failure in assembler pass 1: {}", reason);
+      return;
+    }
 
-//     // Verify that the 
-//     if let Ok(label_map) = result {
-//       assert_eq!(label_map.len(), 3);
-//       assert_eq!(label_map.get("label1").unwrap(), &0x100);
-//       assert_eq!(label_map.get("label2").unwrap(), &0x101);
-//       assert_eq!(label_map.get("label3").unwrap(), &0x103);
-//     }
-//   }
+    // Verify that the 
+    if let Ok(label_map) = result {
+      assert_eq!(label_map.len(), 3);
+      assert_eq!(label_map.get("label1").unwrap(), &(0x100.as_u12().unwrap()));
+      assert_eq!(label_map.get("label2").unwrap(), &(0x101.as_u12().unwrap()));
+      assert_eq!(label_map.get("label3").unwrap(), &(0x103.as_u12().unwrap()));
+    }
+  }
 
-//   #[test]
-//   fn test_define_labels_does_semantic_analysis_on_org() {
-//     let program = vec![
-//       make_directive_node(1, "org", vec![])
-//     ];
+  #[test]
+  fn test_define_labels_does_semantic_analysis_on_org() {
+    let program = vec![
+      make_directive_node(1, "org", vec![])
+    ];
 
-//     let result = define_labels(&program);
-//     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
-//   }
+    let result = define_labels(&program);
+    assert_eq!(result, Err(String::from("-:1:2-4: error: Incorrect number of parameters (0) for directive .org, expecting 1.")));
+  }
 
-//   #[test]
-//   fn test_define_labels_does_semantic_analysis_on_db() {
-//     let program = vec![
-//       make_directive_node(1, "db", vec![])
-//     ];
+  #[test]
+  fn test_define_labels_does_semantic_analysis_on_db() {
+    let program = vec![
+      make_directive_node(1, "db", vec![])
+    ];
 
-//     let result = define_labels(&program);
-//     assert_eq!(result, Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
-//   }
+    let result = define_labels(&program);
+    assert_eq!(result, Err(String::from("-:1:2-3: error: Incorrect number of parameters (0) for directive .db, expecting 1 or more.")));
+  }
 
-//   #[test]
-//   fn test_define_labels_fails_on_redefinition() {
-//     let program = vec![
-//       make_label_node(1, "L1"),
-//       make_label_node(2, "L1"),
-//     ];
+  #[test]
+  fn test_define_labels_fails_on_redefinition() {
+    let program = vec![
+      make_label_node(1, "L1"),
+      make_label_node(2, "L1"),
+    ];
 
-//     let result = define_labels(&program);
-//     assert_eq!(result, Err("Attempted re-definition of label L1.".to_string()));
-//   }
+    let result = define_labels(&program);
+    assert_eq!(result, Err(String::from("-:2:1-2: error: Attempted re-definition of label L1.")));
+  }
 
-//   // MARK: - Pass 2 Tests
-
-// }
+}
 
