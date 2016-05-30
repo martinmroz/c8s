@@ -335,9 +335,9 @@ mod tests {
 
     // Failure Mode 2: Undefined Label.
     let label_field = InstructionField::Identifier("TEST_LABEL");
-    let invalid_jp = Instruction::from_mnemonic_and_parameters("jp", vec![label_field.clone()], &empty_map);
-    assert_eq!(invalid_jp.is_err(), true);
-    assert_eq!(invalid_jp.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
+    let invalid_jp_nl = Instruction::from_mnemonic_and_parameters("jp", vec![label_field.clone()], &empty_map);
+    assert_eq!(invalid_jp_nl.is_err(), true);
+    assert_eq!(invalid_jp_nl.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
 
     // Success 1: Literal 12-bit Numeric.
     let literal_field = InstructionField::NumericLiteral(u12::MAX);
@@ -349,6 +349,83 @@ mod tests {
     let jp_label = Instruction::from_mnemonic_and_parameters("jp", vec![label_field], &defined_map).unwrap();
     assert_eq!(jp_label.size(), 2);
     assert_eq!(jp_label.0, Opcode::JP { target: u12::MAX });
+  }
+
+  #[test]
+  pub fn test_call() {
+    let empty_map = BTreeMap::new();
+    let mut defined_map = BTreeMap::new();
+    defined_map.insert("TEST_LABEL", u12::MAX);
+
+    // Failure Mode 1: No Parameters.
+    let invalid_call = Instruction::from_mnemonic_and_parameters("call", vec![], &empty_map);
+    assert_eq!(invalid_call.is_err(), true);
+    assert_eq!(invalid_call.unwrap_err(), String::from("No matching format for instruction: call"));
+
+    // Failure Mode 2: Undefined Label.
+    let label_field = InstructionField::Identifier("TEST_LABEL");
+    let invalid_call_nl = Instruction::from_mnemonic_and_parameters("call", vec![label_field.clone()], &empty_map);
+    assert_eq!(invalid_call_nl.is_err(), true);
+    assert_eq!(invalid_call_nl.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
+
+    // Success 1: Literal 12-bit Numeric.
+    let literal_field = InstructionField::NumericLiteral(u12::MAX);
+    let call_literal = Instruction::from_mnemonic_and_parameters("call", vec![literal_field], &empty_map).unwrap();
+    assert_eq!(call_literal.size(), 2);
+    assert_eq!(call_literal.0, Opcode::CALL { target: u12::MAX });
+
+    // Success 2: Defined 12-bit Label.
+    let call_label = Instruction::from_mnemonic_and_parameters("call", vec![label_field], &defined_map).unwrap();
+    assert_eq!(call_label.size(), 2);
+    assert_eq!(call_label.0, Opcode::CALL { target: u12::MAX });
+  }
+
+  #[test]
+  pub fn test_se_immediate_and_register() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+
+    // Skip Next If vX == vY.
+    let se_rr = Instruction::from_mnemonic_and_parameters("se", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(se_rr.size(), 2);
+    assert_eq!(se_rr.0, Opcode::SE_REGISTER { register_x: 1, register_y: 2 });
+
+    // Skip next if vX == nn.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xFF));
+    let se_imm = Instruction::from_mnemonic_and_parameters("se", vec![register_field_1, immediate_field], &empty_map).unwrap();
+    assert_eq!(se_imm.size(), 2);
+    assert_eq!(se_imm.0, Opcode::SE_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Immediate fields for se vX, $nn is limited to 8 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let invalid_se_imm = Instruction::from_mnemonic_and_parameters("se", vec![register_field_1, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_se_imm.is_err(), true);
+    assert_eq!(invalid_se_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+  }
+
+  #[test]
+  pub fn test_sne_immediate_and_register() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+
+    // Skip Next If vX != vY.
+    let sne_rr = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(sne_rr.size(), 2);
+    assert_eq!(sne_rr.0, Opcode::SNE_REGISTER { register_x: 1, register_y: 2 });
+
+    // Skip next if vX != nn.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xFF));
+    let sne_imm = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, immediate_field], &empty_map).unwrap();
+    assert_eq!(sne_imm.size(), 2);
+    assert_eq!(sne_imm.0, Opcode::SNE_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Immediate fields for sne vX, $nn is limited to 8 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let invalid_sne_imm = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_sne_imm.is_err(), true);
+    assert_eq!(invalid_sne_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
   }
 
 }
