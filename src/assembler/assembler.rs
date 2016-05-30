@@ -5,7 +5,6 @@ use std::mem;
 use assembler::data_range::DataRange;
 use assembler::directive::*;
 use assembler::instruction::*;
-use assembler::opcode::Opcode;
 use assembler::parser::{Literal, Node, InstructionField};
 use assembler::source_file_location::SourceFileLocation;
 use assembler::u12::*;
@@ -90,17 +89,21 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
       Node::Label(ref data) => {
         // Map the label to the current address and remove from the ASL.
         if label_address_map.contains_key(&data.identifier) {
-          return Err(format!("Attempted re-definition of label {}.", data.identifier));
+          let reason = format!("Attempted re-definition of label {}.", data.identifier);
+          return Err(format_semantic_error(&data.location, reason));
         } else {
           label_address_map.insert(data.identifier, current_address);
         }
       }
 
-      Node::Instruction(_) => {
+      Node::Instruction(ref data) => {
         // All Chip8 instructions are the same length.
         current_address = match current_address.checked_add(*BYTES_PER_INSTRUCTION) {
-                None => { return Err(format!("Instruction would cause address counter to overflow.")); }
-           Some(sum) => { sum }
+          Some(sum) => sum,
+          None => { 
+            let reason = format!("Instruction would cause address counter to overflow $FFF.");
+            return Err(format_semantic_error(&data.location, reason));
+          }
         };
       }
     }
