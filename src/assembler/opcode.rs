@@ -3,6 +3,8 @@ use std::fmt;
 
 use assembler::u12::*;
 
+// TODO: mm: SHL and SHR ignore their Vy parameters on interpretation.
+
 #[allow(non_camel_case_types)]
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum Opcode {

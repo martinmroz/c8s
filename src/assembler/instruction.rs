@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use assembler::assembler::Emittable;
 use assembler::opcode::Opcode;
-use assembler::parser::{Literal, InstructionField};
+use assembler::parser::InstructionField;
 use assembler::u12::*;
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -41,7 +41,9 @@ fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
  */
 fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
   match literal.as_u8() {
-    Some(value) if value < 16 => Ok(value),
+    Some(value) if value < 16 => {
+      Ok(value)
+    }
     _ => {
       Err(format!("Found 12-bit numeric literal ${:X}, expecting 4-bit value.", literal.as_usize()))
     }
@@ -91,6 +93,10 @@ impl<'a> Instruction {
           let address = try!(resolve_label_with_map(label, label_map));
           Some(Opcode::CALL { target: address })
         }
+
+        ("shr", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SHR { register_x: x, register_y: 0 }),
+
+        ("shl", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SHL { register_x: x, register_y: 0 }),
 
         _ => None
       }
@@ -147,16 +153,8 @@ impl<'a> Instruction {
           Some(Opcode::SUB { register_x: x, register_y: y })
         }
 
-        ("shr", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-          Some(Opcode::SHR { register_x: x, register_y: y })
-        }
-
         ("subn", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
           Some(Opcode::SUBN { register_x: x, register_y: y })
-        }
-
-        ("shl", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
-          Some(Opcode::SHL { register_x: x, register_y: y })
         }
 
         ("ld", &InstructionField::IndexRegister, &InstructionField::NumericLiteral(value)) => {
@@ -223,7 +221,7 @@ impl<'a> Instruction {
           Some(Opcode::SAVE_I { register_x: x })
         }
 
-        ("restore", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        ("restore", &InstructionField::GeneralPurposeRegister(x), &InstructionField::IndexRegisterIndirect) => {
           Some(Opcode::RESTORE_I { register_x: x })
         }
 
@@ -251,7 +249,7 @@ impl<'a> Instruction {
           0 => Err(format!("No matching format for instruction: {}", mnemonic)),
           _ => {
             let field_strings = fields.iter().map(|field| format!("{}", field));
-            let field_description = field_strings.collect::<Vec<_>>().connect(",");
+            let field_description = field_strings.collect::<Vec<_>>().join(",");
             Err(format!("No matching format for instruction: {} {}", mnemonic, field_description))
           }
         }
@@ -290,7 +288,7 @@ mod tests {
 
   use assembler::assembler::Emittable;
   use assembler::opcode::Opcode;
-  use assembler::parser::{InstructionField, Literal};
+  use assembler::parser::InstructionField;
   use assembler::u12;
   use assembler::u12::*;
 
@@ -366,6 +364,37 @@ mod tests {
   }
 
   #[test]
+  fn test_jp_v0() {
+    let empty_map = BTreeMap::new();
+    let mut defined_map = BTreeMap::new();
+    defined_map.insert("TEST_LABEL", u12::MAX);
+
+    let v0_field = InstructionField::GeneralPurposeRegister(0);
+
+    // Failure Mode 1: Just v0.
+    let invalid_jp_v0 = Instruction::from_mnemonic_and_parameters("jp", vec![v0_field.clone()], &empty_map);
+    assert_eq!(invalid_jp_v0.is_err(), true);
+    assert_eq!(invalid_jp_v0.unwrap_err(), String::from("No matching format for instruction: jp v0"));
+
+    // Failure Mode 2: Undefined Label.
+    let label_field = InstructionField::Identifier("TEST_LABEL");
+    let invalid_jp_v0_nl = Instruction::from_mnemonic_and_parameters("jp", vec![v0_field.clone(), label_field.clone()], &empty_map);
+    assert_eq!(invalid_jp_v0_nl.is_err(), true);
+    assert_eq!(invalid_jp_v0_nl.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
+
+    // Success 1: Literal 12-bit Numeric.
+    let literal_field = InstructionField::NumericLiteral(u12::MAX);
+    let jp_v0_literal = Instruction::from_mnemonic_and_parameters("jp", vec![v0_field.clone(), literal_field], &empty_map).unwrap();
+    assert_eq!(jp_v0_literal.size(), 2);
+    assert_eq!(jp_v0_literal.0, Opcode::JP_V0 { value: u12::MAX });
+
+    // Success 2: Defined 12-bit Label.
+    let jp_v0_label = Instruction::from_mnemonic_and_parameters("jp", vec![v0_field, label_field], &defined_map).unwrap();
+    assert_eq!(jp_v0_label.size(), 2);
+    assert_eq!(jp_v0_label.0, Opcode::JP_V0 { value: u12::MAX });
+  }
+
+  #[test]
   fn test_call() {
     let empty_map = BTreeMap::new();
     let mut defined_map = BTreeMap::new();
@@ -395,7 +424,7 @@ mod tests {
   }
 
   #[test]
-  fn test_se_immediate_and_register() {
+  fn test_se_immediate_and_register_and_keypad() {
     let empty_map = BTreeMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
@@ -416,10 +445,16 @@ mod tests {
     let invalid_se_imm = Instruction::from_mnemonic_and_parameters("se", vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_se_imm.is_err(), true);
     assert_eq!(invalid_se_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+
+    // Skip next if key represented by vX is pressed.
+    let keypad_field = InstructionField::KeypadRegister;
+    let se_k = Instruction::from_mnemonic_and_parameters("se", vec![register_field_1, keypad_field], &empty_map).unwrap();
+    assert_eq!(se_k.size(), 2);
+    assert_eq!(se_k.0, Opcode::SE_K { register_x: 1 });
   }
 
   #[test]
-  fn test_sne_immediate_and_register() {
+  fn test_sne_immediate_and_register_and_keypad() {
     let empty_map = BTreeMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
@@ -440,10 +475,16 @@ mod tests {
     let invalid_sne_imm = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_sne_imm.is_err(), true);
     assert_eq!(invalid_sne_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+
+    // Skip next if key represented by vX is NOT pressed.
+    let keypad_field = InstructionField::KeypadRegister;
+    let sne_k = Instruction::from_mnemonic_and_parameters("sne", vec![register_field_1, keypad_field], &empty_map).unwrap();
+    assert_eq!(sne_k.size(), 2);
+    assert_eq!(sne_k.0, Opcode::SNE_K { register_x: 1 });
   }
 
   #[test]
-  fn test_ld_immediate_and_register() {
+  fn test_ld_immediate_and_register_and_index() {
     let empty_map = BTreeMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
@@ -464,6 +505,31 @@ mod tests {
     let invalid_ld_imm = Instruction::from_mnemonic_and_parameters("ld", vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_ld_imm.is_err(), true);
     assert_eq!(invalid_ld_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+  }
+
+  #[test]
+  fn test_ld_index() {
+    let empty_map = BTreeMap::new();
+    let mut defined_map = BTreeMap::new();
+    defined_map.insert("TEST_LABEL", u12::MAX);
+
+    // Failure Mode: Undefined Label.
+    let index_register_field = InstructionField::IndexRegister;
+    let label_field = InstructionField::Identifier("TEST_LABEL");
+    let invalid_ld_i = Instruction::from_mnemonic_and_parameters("ld", vec![index_register_field.clone(), label_field.clone()], &empty_map);
+    assert_eq!(invalid_ld_i.is_err(), true);
+    assert_eq!(invalid_ld_i.unwrap_err(), String::from("Unable to resolve address of label TEST_LABEL"));
+
+    // Success 1: Literal 12-bit Numeric.
+    let literal_field = InstructionField::NumericLiteral(u12::MAX);
+    let ld_i_literal = Instruction::from_mnemonic_and_parameters("ld", vec![index_register_field.clone(), literal_field], &empty_map).unwrap();
+    assert_eq!(ld_i_literal.size(), 2);
+    assert_eq!(ld_i_literal.0, Opcode::LD_I { value: u12::MAX });
+
+    // Success 2: Defined 12-bit Label.
+    let ld_i_label = Instruction::from_mnemonic_and_parameters("ld", vec![index_register_field, label_field], &defined_map).unwrap();
+    assert_eq!(ld_i_label.size(), 2);
+    assert_eq!(ld_i_label.0, Opcode::LD_I { value: u12::MAX });
   }
 
   #[test]
@@ -494,6 +560,162 @@ mod tests {
     let add_i = Instruction::from_mnemonic_and_parameters("add", vec![index_register_field, register_field_2], &empty_map).unwrap();
     assert_eq!(add_i.size(), 2);
     assert_eq!(add_i.0, Opcode::ADD_I_X { register_x: 2 });
+  }
+
+  #[test]
+  fn test_and_or_xor_sub_subn_shr_shl() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+
+    // And vX & vY.
+    let and = Instruction::from_mnemonic_and_parameters("and", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(and.size(), 2);
+    assert_eq!(and.0, Opcode::AND { register_x: 1, register_y: 2 });
+
+    // Or vX | vY.
+    let or = Instruction::from_mnemonic_and_parameters("or", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(or.size(), 2);
+    assert_eq!(or.0, Opcode::OR { register_x: 1, register_y: 2 });
+
+    // Xor vX ^ vY.
+    let xor = Instruction::from_mnemonic_and_parameters("xor", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(xor.size(), 2);
+    assert_eq!(xor.0, Opcode::XOR { register_x: 1, register_y: 2 });
+
+    // Sub vX - vY.
+    let sub = Instruction::from_mnemonic_and_parameters("sub", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(sub.size(), 2);
+    assert_eq!(sub.0, Opcode::SUB { register_x: 1, register_y: 2 });
+
+    // Subn vY - vX.
+    let subn = Instruction::from_mnemonic_and_parameters("subn", vec![register_field_1, register_field_2], &empty_map).unwrap();
+    assert_eq!(subn.size(), 2);
+    assert_eq!(subn.0, Opcode::SUBN { register_x: 1, register_y: 2 });
+
+    // Shr vX.
+    let shr = Instruction::from_mnemonic_and_parameters("shr", vec![register_field_1], &empty_map).unwrap();
+    assert_eq!(shr.size(), 2);
+    assert_eq!(shr.0, Opcode::SHR { register_x: 1, register_y: 0 });
+
+    // Shl vX.
+    let shl = Instruction::from_mnemonic_and_parameters("shl", vec![register_field_1], &empty_map).unwrap();
+    assert_eq!(shl.size(), 2);
+    assert_eq!(shl.0, Opcode::SHL { register_x: 1, register_y: 0 });
+  }
+
+  #[test]
+  fn test_rnd() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+
+    // Rnd vX, imm8.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xFF));
+    let rnd_imm = Instruction::from_mnemonic_and_parameters("rnd", vec![register_field_1, immediate_field], &empty_map).unwrap();
+    assert_eq!(rnd_imm.size(), 2);
+    assert_eq!(rnd_imm.0, Opcode::RND { register_x: 1, mask: 0xFF });
+
+    // Immediate fields for rnd vX, $nn is limited to 8 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let invalid_rnd_imm = Instruction::from_mnemonic_and_parameters("rnd", vec![register_field_1, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_rnd_imm.is_err(), true);
+    assert_eq!(invalid_rnd_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
+  }
+
+  #[test]
+  fn test_drw() {
+    let empty_map = BTreeMap::new();
+    let register_field_1 = InstructionField::GeneralPurposeRegister(1);
+    let register_field_2 = InstructionField::GeneralPurposeRegister(2);
+
+    // Drw vX, vY, imm4.
+    let immediate_field = InstructionField::NumericLiteral(U12::from(0xF));
+    let drw = Instruction::from_mnemonic_and_parameters("drw", vec![register_field_1, register_field_2, immediate_field], &empty_map).unwrap();
+    assert_eq!(drw.size(), 2);
+    assert_eq!(drw.0, Opcode::DRW { register_x: 1, register_y: 2, bytes: 15 });
+
+    // Immediate fields for drw vX, vY, $n is limited to 4 bits.
+    let immediate_field_invalid = InstructionField::NumericLiteral(U12::from(0x10));
+    let invalid_drw = Instruction::from_mnemonic_and_parameters("drw", vec![register_field_1, register_field_2, immediate_field_invalid], &empty_map);
+    assert_eq!(invalid_drw.is_err(), true);
+    assert_eq!(invalid_drw.unwrap_err(), String::from("Found 12-bit numeric literal $10, expecting 4-bit value."));
+  }
+
+  #[test]
+  fn test_ld_delay_and_sound_timer_and_keypad() {
+    let empty_map = BTreeMap::new();
+    let register_field = InstructionField::GeneralPurposeRegister(15);
+    let sound_timer_field = InstructionField::SoundTimer;
+    let delay_timer_field = InstructionField::DelayTimer;
+    let keypad_field = InstructionField::KeypadRegister;
+
+    // Ld vX := DT.
+    let ld_vx_dt = Instruction::from_mnemonic_and_parameters("ld", vec![register_field, delay_timer_field], &empty_map).unwrap();
+    assert_eq!(ld_vx_dt.size(), 2);
+    assert_eq!(ld_vx_dt.0, Opcode::LD_X_DT { register_x: 15 });
+
+    // Ld vX := K.
+    let ld_vx_k = Instruction::from_mnemonic_and_parameters("ld", vec![register_field, keypad_field], &empty_map).unwrap();
+    assert_eq!(ld_vx_k.size(), 2);
+    assert_eq!(ld_vx_k.0, Opcode::LD_X_K { register_x: 15 });
+
+    // Ld DT := vX.
+    let ld_dt_vx = Instruction::from_mnemonic_and_parameters("ld", vec![delay_timer_field, register_field], &empty_map).unwrap();
+    assert_eq!(ld_dt_vx.size(), 2);
+    assert_eq!(ld_dt_vx.0, Opcode::LD_DT_X { register_x: 15 });
+
+    // Ld ST := vX.
+    let ld_st_vx = Instruction::from_mnemonic_and_parameters("ld", vec![sound_timer_field, register_field], &empty_map).unwrap();
+    assert_eq!(ld_st_vx.size(), 2);
+    assert_eq!(ld_st_vx.0, Opcode::LD_ST_X { register_x: 15 });
+  }
+
+  #[test]
+  fn test_sprite() {
+    let empty_map = BTreeMap::new();
+    let register_field = InstructionField::GeneralPurposeRegister(7);
+    let index_register_field = InstructionField::IndexRegister;
+
+    // Sprite I, vX.
+    let sprite_i = Instruction::from_mnemonic_and_parameters("sprite", vec![index_register_field, register_field], &empty_map).unwrap();
+    assert_eq!(sprite_i.size(), 2);
+    assert_eq!(sprite_i.0, Opcode::SPRITE_I { register_x: 7 });
+  }
+
+  #[test]
+  fn test_bcd() {
+    let empty_map = BTreeMap::new();
+    let register_field = InstructionField::GeneralPurposeRegister(7);
+    let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
+
+    // Bcd [i], vX.
+    let bcd_i = Instruction::from_mnemonic_and_parameters("bcd", vec![index_register_indirect_field, register_field], &empty_map).unwrap();
+    assert_eq!(bcd_i.size(), 2);
+    assert_eq!(bcd_i.0, Opcode::BCD_I { register_x: 7 });
+  }
+
+  #[test]
+  fn test_save() {
+    let empty_map = BTreeMap::new();
+    let register_field = InstructionField::GeneralPurposeRegister(7);
+    let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
+
+    // Save [i], vX.
+    let save_i = Instruction::from_mnemonic_and_parameters("save", vec![index_register_indirect_field, register_field], &empty_map).unwrap();
+    assert_eq!(save_i.size(), 2);
+    assert_eq!(save_i.0, Opcode::SAVE_I { register_x: 7 });
+  }
+
+  #[test]
+  fn test_restore() {
+    let empty_map = BTreeMap::new();
+    let register_field = InstructionField::GeneralPurposeRegister(7);
+    let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
+
+    // Save [i], vX.
+    let restore_i = Instruction::from_mnemonic_and_parameters("restore", vec![register_field, index_register_indirect_field], &empty_map).unwrap();
+    assert_eq!(restore_i.size(), 2);
+    assert_eq!(restore_i.0, Opcode::RESTORE_I { register_x: 7 });
   }
 
 }
