@@ -98,7 +98,7 @@ impl Emittable for Directive {
    */
   fn into_slice(self) -> Vec<u8> {
     match self {
-      Directive::Org(_)       => vec![],
+      Directive::Org(_)       => Vec::new(),
       Directive::Db(data)     => data
     }
   }
@@ -113,7 +113,6 @@ mod tests {
   use assembler::assembler::Emittable;
   use assembler::parser::Literal;
   use assembler::u12;
-  use assembler::u12::*;
 
   use super::*;
 
@@ -165,17 +164,14 @@ mod tests {
 
   #[test]
   fn test_size_of_directive_for_db() {
-    let expected_sizes = [1, 11, 12];
-    let directives = [
-      Directive::from_identifier_and_parameters("db", &vec![Literal::Numeric(0xFF)]).ok().unwrap(),
-      Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING")]).ok().unwrap(),
-      Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]).ok().unwrap()
+    let test_cases = [
+      (1,  Directive::from_identifier_and_parameters("db", &vec![Literal::Numeric(0xFF)]).ok().unwrap().size()),
+      (11, Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING")]).ok().unwrap().size()),
+      (12, Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]).ok().unwrap().size())
     ];
 
     // Validate the expected size is obtained for each directive.
-    for (i, directive) in directives.iter().enumerate() {
-      let size = directive.size();
-      let expected_size = expected_sizes[i];
+    for &(expected_size, size) in test_cases.iter() {
       assert_eq!(size, expected_size);
     }
   }
