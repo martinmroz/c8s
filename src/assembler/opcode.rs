@@ -4,7 +4,7 @@ use std::fmt;
 use assembler::u12::*;
 
 #[allow(non_camel_case_types)]
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum Opcode {
   NOP             ,
   CLS             ,

@@ -25,7 +25,7 @@ impl<'a> Directive {
    @param arguments The literal arguments specified for the directive.
    @return Directive in the event the arguments are valid for the directive, or a failure reason.
    */
-  pub fn from_identifier_and_parameters(identifier: &'a str, arguments: &Vec<Literal>) -> Result<Directive,String> {
+  pub fn from_identifier_and_parameters(identifier: &'a str, arguments: &Vec<Literal>) -> Result<Self,String> {
     /*
      The 'org' directive is used to set the current output origin address. The directive requires
      a single numeric literal in the range $000-$FFF.
@@ -165,7 +165,7 @@ mod tests {
   #[test]
   fn test_size_of_directive_for_db() {
     let test_cases = [
-      (1,  Directive::from_identifier_and_parameters("db", &vec![Literal::Numeric(0xFF)]).ok().unwrap().size()),
+      ( 1, Directive::from_identifier_and_parameters("db", &vec![Literal::Numeric(0xFF)]).ok().unwrap().size()),
       (11, Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING")]).ok().unwrap().size()),
       (12, Directive::from_identifier_and_parameters("db", &vec![Literal::String("TEST_STRING"), Literal::Numeric(0x00)]).ok().unwrap().size())
     ];

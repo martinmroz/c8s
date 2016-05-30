@@ -406,20 +406,6 @@ mod tests {
   }
   
   // MARK: - Non-Coding
-  
-  #[test]
-  fn test_newline_ignores_windows_terminators() {
-    let mut scanner = Scanner::new("-", "\n\r\n\n \n");
-    assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 1, 1, 1))));
-    assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 2, 2, 1))));
-    assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 3, 1, 1))));
-    assert_eq!(scanner.is_at_end(), false);
-    assert_eq!(scanner.next(), Some(Token::Newline(SourceFileLocation::new("-", 4, 2, 1))));
-    assert_eq!(scanner.is_at_end(), true);
-  }
 
   #[test]
   fn test_newline() {
