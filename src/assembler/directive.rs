@@ -1,7 +1,6 @@
 
 use std::fmt;
 
-use assembler::assembler::Emittable;
 use assembler::parser::Literal;
 use assembler::u12::*;
 
@@ -30,6 +29,7 @@ mod names {
 }
 
 impl<'a> Directive {
+
   /** 
    Validate the semantics of a directive and yield the Emittable representation.
    @param identifier The identifier for a directive.
@@ -89,14 +89,11 @@ impl<'a> Directive {
 
     Err(format!("Unrecognized directive .{}", identifier))
   }
-}
-
-impl Emittable for Directive {
 
   /**
    @return The size of the directive in the output stream in bytes.
    */
-  fn size(&self) -> usize {
+  pub fn size(&self) -> usize {
     match *self {
       Directive::Org(_)       => 0,
       Directive::Db(ref data) => data.len()
@@ -107,7 +104,7 @@ impl Emittable for Directive {
    Consuming conversion from a directive element into the byte representation in the output stream.
    @return A Vec of bytes to be written into the output stream for the directive.
    */
-  fn into_vec(self) -> Vec<u8> {
+  pub fn into_vec(self) -> Vec<u8> {
     match self {
       Directive::Org(_)       => Vec::new(),
       Directive::Db(data)     => data
@@ -121,7 +118,6 @@ impl Emittable for Directive {
 #[cfg(test)]
 mod tests {
 
-  use assembler::assembler::Emittable;
   use assembler::parser::Literal;
   use assembler::u12;
 

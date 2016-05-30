@@ -1,7 +1,6 @@
 
 use std::collections::BTreeMap;
 
-use assembler::assembler::Emittable;
 use assembler::opcode::Opcode;
 use assembler::parser::InstructionField;
 use assembler::u12::*;
@@ -51,6 +50,7 @@ fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
 }
 
 impl<'a> Instruction {
+
 	/**
 	 Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
 	 label resolution map). Produces an error message in the event of failure.
@@ -256,20 +256,17 @@ impl<'a> Instruction {
       }
     };
 	}
-}
-
-impl Emittable for Instruction {
 
   /**
    @return The size of the instruction in the output stream in bytes (always 2).
    */
-  fn size(&self) -> usize { 2 }
+  pub fn size(&self) -> usize { 2 }
 
   /**
    Consuming conversion from a directive element into the byte representation in the output stream.
    @return A Vec of bytes to be written into the output stream for the directive.
    */
-  fn into_vec(self) -> Vec<u8> {
+  pub fn into_vec(self) -> Vec<u8> {
     let instruction: u16 = self.0.as_instruction();
     vec![
       ((instruction & 0xFF00) >> 8) as u8,
@@ -286,7 +283,6 @@ mod tests {
 
   use std::collections::BTreeMap;
 
-  use assembler::assembler::Emittable;
   use assembler::opcode::Opcode;
   use assembler::parser::InstructionField;
   use assembler::u12;
