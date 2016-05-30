@@ -1,4 +1,5 @@
 
+use std::fmt;
 use std::mem;
 
 use assembler::source_file_location::SourceFileLocation;
@@ -83,6 +84,26 @@ struct Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   current_token: Option<Token<'a>>,
   /// Lookahead token.
   next_token: Option<Token<'a>>
+}
+
+// MARK: - Instruction Field
+
+impl<'a> fmt::Display for InstructionField<'a> {
+  /**
+   Formats the instruction field for display purposes.
+   */
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &InstructionField::NumericLiteral(value)      => write!(f, "${:x}", value.as_usize()),
+      &InstructionField::GeneralPurposeRegister(r)  => write!(f, "v{:x}", r),
+      &InstructionField::DelayTimer                 => write!(f, "dt"),
+      &InstructionField::SoundTimer                 => write!(f, "st"),
+      &InstructionField::KeypadRegister             => write!(f, "k"),
+      &InstructionField::IndexRegister              => write!(f, "i"),
+      &InstructionField::IndexRegisterIndirect      => write!(f, "[i]"),
+      &InstructionField::Identifier(id)             => write!(f, "{}", id)
+    }
+  }
 }
 
 // MARK: - Helper Macros
