@@ -7,6 +7,7 @@ use assembler::directive::*;
 use assembler::instruction::*;
 use assembler::opcode::Opcode;
 use assembler::parser::{Literal, Node, InstructionField};
+use assembler::source_file_location::SourceFileLocation;
 use assembler::u12::*;
 
 // MARK: - Emittable
@@ -28,7 +29,15 @@ pub trait Emittable {
 
 // MARK: - Constants
 
-const BYTES_PER_INSTRUCTION: u8 = 2;
+lazy_static! {
+  static ref BYTES_PER_INSTRUCTION: U12 = U12::from(2);
+}
+
+// MARK: - Helper Methods
+
+fn format_semantic_error<'a>(location: &'a SourceFileLocation, description: String) -> String {
+  format!("{}: error: {}", location, description)
+}
 
 // MARK: - Pass 1: Define Labels
 
@@ -49,18 +58,27 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
     match *node {
       Node::Directive(ref data) => {
         // Validate the directive and that the arguments match the identifier.
-        let directive = try!(Directive::from_identifier_and_parameters(data.identifier, &data.arguments));
+        let directive = match Directive::from_identifier_and_parameters(data.identifier, &data.arguments) {
+           Ok(result) => result,
+          Err(reason) => return Err(format_semantic_error(&data.location, reason))
+        };
 
         // Ensure the directive is not too large to emit.
         let directive_size = match directive.size().as_u12() {
-                None => { return Err(format!("Directive too large.")); }
-          Some(size) => { size }
+          Some(size) => size,
+          None => {
+            let reason = format!("Directive ({}) size {} exceeds 4096 bytes.", directive, directive.size());
+            return Err(format_semantic_error(&data.location, reason));
+          }
         };
 
         // Offset the current address by the size of the directive being processed.
         current_address = match current_address.checked_add(directive_size) {
-                None => { return Err(format!("Directive would cause address counter to overflow.")); }
-           Some(sum) => { sum }
+          Some(sum) => sum,
+          None => {
+            let reason = format!("Directive ({}) would cause the 12-bit address counter to overflow.", directive);
+            return Err(format_semantic_error(&data.location, reason));
+          }
         };
 
         // The origin directive changes the current address.
@@ -80,7 +98,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
       Node::Instruction(_) => {
         // All Chip8 instructions are the same length.
-        current_address = match current_address.checked_add(U12::from(BYTES_PER_INSTRUCTION)) {
+        current_address = match current_address.checked_add(*BYTES_PER_INSTRUCTION) {
                 None => { return Err(format!("Instruction would cause address counter to overflow.")); }
            Some(sum) => { sum }
         };
@@ -98,5 +116,9 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-    Err(String::from("Mission failed."))
+  let label_address_map = try!(define_labels(&syntax_list));
+
+  println!("{:?}", label_address_map);
+
+  Err(String::from("Mission failed."))
 }

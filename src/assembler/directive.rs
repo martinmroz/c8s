@@ -1,4 +1,6 @@
 
+use std::fmt;
+
 use assembler::assembler::Emittable;
 use assembler::parser::Literal;
 use assembler::u12::*;
@@ -9,6 +11,15 @@ pub enum Directive {
   Org(U12),
   /// Directive to emit the specified bytes.
   Db(Vec<u8>)
+}
+
+impl fmt::Display for Directive {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &Directive::Org(location) => write!(f, ".{} ${:3X}",     names::ORG, location.as_usize()),
+      &Directive::Db(ref bytes) => write!(f, ".{} [{} bytes]", names::DB,  bytes.len())
+    }
+  }
 }
 
 mod names {
@@ -32,7 +43,7 @@ impl<'a> Directive {
      */
     if identifier == names::ORG {
       if arguments.len() != 1 {
-        return Err(format!("Incorrect number of parameters ({}) for directive .org, expecting 1.", arguments.len()));
+        return Err(format!("Incorrect number of parameters ({}) for directive .{}, expecting 1.", arguments.len(), names::ORG));
       }
 
       return match arguments[0] {
@@ -40,7 +51,7 @@ impl<'a> Directive {
           Ok(Directive::Org(a.as_u12().unwrap()))
         }
         _ => {
-          Err(format!("Directive .org requires 1 numeric literal in the range $000-$FFF."))
+          Err(format!("Directive .{} requires 1 numeric literal in the range $000-$FFF.", names::ORG))
         }
       }
     }
@@ -52,7 +63,7 @@ impl<'a> Directive {
      */
     if identifier == names::DB {
       if arguments.len() == 0 {
-        return Err(format!("Incorrect number of parameters (0) for directive .db, expecting 1 or more."));
+        return Err(format!("Incorrect number of parameters (0) for directive .{}, expecting 1 or more.", names::DB));
       }
 
       let mut bytes = Vec::new();
@@ -62,7 +73,7 @@ impl<'a> Directive {
         match argument {
           &Literal::Numeric(value) => {
             if value > 0xFF {
-              return Err(format!("All numeric parameters to .db must be 1-byte literals (${:X} > $FF)", value));
+              return Err(format!("All numeric parameters to .{} must be 1-byte literals (${:X} > $FF)", names::DB, value));
             } else {
               bytes.push((value & 0x00FF) as u8);
             }
