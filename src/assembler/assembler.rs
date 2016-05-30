@@ -3,9 +3,9 @@ use std::collections::BTreeMap;
 use std::mem;
 
 use assembler::data_range::DataRange;
-use assembler::directive::*;
-use assembler::instruction::*;
-use assembler::parser::{Literal, Node, InstructionField};
+use assembler::directive::Directive;
+use assembler::instruction::Instruction;
+use assembler::parser::Node;
 use assembler::source_file_location::SourceFileLocation;
 use assembler::u12::*;
 
@@ -174,8 +174,5 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
   let label_address_map = try!(define_labels(&syntax_list));
-
-  println!("{:?}", label_address_map);
-
-  Err(String::from("Mission failed."))
+  emit_data_ranges(syntax_list, &label_address_map)
 }
