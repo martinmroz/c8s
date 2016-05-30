@@ -2,6 +2,7 @@
 pub mod assembler;
 pub mod data_range;
 pub mod directive;
+pub mod i8hex_writer;
 pub mod instruction;
 pub mod opcode;
 pub mod parser;
