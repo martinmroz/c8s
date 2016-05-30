@@ -228,13 +228,12 @@ mod tests {
       return;
     }
 
-    // Verify that the 
-    if let Ok(label_map) = result {
-      assert_eq!(label_map.len(), 3);
-      assert_eq!(label_map.get("label1").unwrap(), &(0x100.as_u12().unwrap()));
-      assert_eq!(label_map.get("label2").unwrap(), &(0x101.as_u12().unwrap()));
-      assert_eq!(label_map.get("label3").unwrap(), &(0x103.as_u12().unwrap()));
-    }
+    // Verify that the labels are defined as expected.
+    let label_map = result.unwrap();
+    assert_eq!(label_map.len(), 3);
+    assert_eq!(label_map.get("label1").unwrap(), &(0x100.as_u12().unwrap()));
+    assert_eq!(label_map.get("label2").unwrap(), &(0x101.as_u12().unwrap()));
+    assert_eq!(label_map.get("label3").unwrap(), &(0x103.as_u12().unwrap()));
   }
 
   #[test]
