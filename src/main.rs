@@ -13,13 +13,15 @@ use assembler::assembler::*;
 use assembler::i8hex_writer::*;
 
 fn main() {
-
   let path = "/Users/martinmroz/Development/c8s/src/test.S";
   
   // Open the file specified by path.
   let mut file = match File::open(path) {
-    Ok(result) => { result }
-    Err(_) => { panic!("Unable to open file {}", path); }
+    Ok(result) => result,
+    Err(reason) => { 
+      println!("Unable to open file {} ({})", path, reason);
+      return;
+    }
   };
   
   let mut buffer = String::new();
@@ -33,13 +35,19 @@ fn main() {
   let scanner = Scanner::new("test.S", buffer.as_str());
   let asl = match parse(scanner) {
     Ok(asl) => asl,
-    Err(reason) => panic!(reason)
+    Err(reason) => {
+      println!("{}", reason);
+      return;
+    }
   };
 
   // Assemble the ASL into data ranges.
   let data_ranges = match assemble(asl) {
     Ok(data_ranges) => data_ranges,
-    Err(reason) => panic!(reason)
+    Err(reason) => {
+      println!("{}", reason);
+      return;
+    }
   };
 
   // Convert the resultant data to Intel HEX (I8HEX version).
