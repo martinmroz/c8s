@@ -182,7 +182,7 @@ mod tests {
 
   #[test]
   fn test_i8hex_representation_of_data_ranges_adjacent_ranges() {
-    // Build an average-case I8HEX record.
+    // Build a pair of adjacent data ranges.
     let mut range_a = DataRange::new(0x100.as_u12().unwrap());
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
     let mut range_b = DataRange::new(0x110.as_u12().unwrap());
@@ -199,7 +199,7 @@ mod tests {
 
   #[test]
   fn test_i8hex_representation_of_data_ranges_disjoint_ranges() {
-    // Build an average-case I8HEX record.
+    // Build an disjoint pair of data ranges.
     let mut range_a = DataRange::new(0x100.as_u12().unwrap());
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
     let mut range_b = DataRange::new(0x130.as_u12().unwrap());
@@ -216,7 +216,7 @@ mod tests {
 
   #[test]
   fn test_i8hex_representation_of_data_ranges_uneven_ranges() {
-    // Build an average-case I8HEX record.
+    // Build an uneven pair of data ranges.
     let mut range_a = DataRange::new(0x100.as_u12().unwrap());
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19]);
     let mut range_b = DataRange::new(0x130.as_u12().unwrap());
@@ -230,6 +230,17 @@ mod tests {
       &":01014000229C\n" +
       &":00000001FF";
     assert_eq!(i8hex_rep, expected_i8hex_rep);
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_i8hex_representation_of_data_ranges_panics_when_overlapping() {
+    // Build an overlapping pair of ranges.
+    let mut range_a = DataRange::new(0x100.as_u12().unwrap());
+    range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
+    let mut range_b = DataRange::new(0x101.as_u12().unwrap());
+    range_b.append(&vec![0x3F,0x01,0x56,0x70,0x2B,0x5E,0x71,0x2B,0x72,0x2B,0x73,0x21,0x46,0x01,0x34,0x21]);
+    i8hex_representation_of_data_ranges(&[&range_a, &range_b]);
   }
 
 }
