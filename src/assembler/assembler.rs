@@ -72,7 +72,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
       Node::Label(ref data) => {
         // Map the label to the current address and remove from the ASL.
         if label_address_map.contains_key(&data.identifier) {
-          let reason = format!("Attempted re-definition of label {}.", data.identifier);
+          let reason = format!("Attempted re-definition of label '{}'.", data.identifier);
           return Err(format_semantic_error(&data.location, reason));
         } else {
           label_address_map.insert(data.identifier, current_address);
@@ -264,7 +264,7 @@ mod tests {
     ];
 
     let result = define_labels(&program);
-    assert_eq!(result, Err(String::from("-:2:1-2: error: Attempted re-definition of label L1.")));
+    assert_eq!(result, Err(String::from("-:2:1-2: error: Attempted re-definition of label 'L1'.")));
   }
 
 }

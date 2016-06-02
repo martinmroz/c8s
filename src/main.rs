@@ -22,6 +22,7 @@ use assembler::scanner::Scanner;
 // MARK: - Assembler
 
 fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F : Fn(String) -> () {
+
   // Open the input file (read-only).
   let mut input_file = File::open(input_path).unwrap_or_else(|reason| {
     log_error(format!("Unable to open input file '{}'", input_path));
@@ -69,8 +70,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
       let range_of_b = b.address_range();
       let (a_first, a_last) = (range_of_a.start.as_usize(), range_of_a.end.as_usize() - 1);
       let (b_first, b_last) = (range_of_b.start.as_usize(), range_of_b.end.as_usize() - 1);
-      log_error(format!("A: {:03X}...{:03X} is overlapping with:", a_first, a_last));
-      log_error(format!("B: {:03X}...{:03X}", b_first, b_last));
+      log_error(format!("  range ${:03X}...${:03X} overlaps with:", a_first, a_last));
+      log_error(format!("  range ${:03X}...${:03X}", b_first, b_last));
     }
 
     process::exit(1);
