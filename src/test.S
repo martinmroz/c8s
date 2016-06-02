@@ -1,8 +1,10 @@
-.org $000
 
-label:
+.org $000
+message:
   .db "Hello, World!", $00
+
+.org $200
 main:
-  ld v1, $01
+  ; Load the Index register with the address of message.
+  ld i, message
   trap
-  call $1FF

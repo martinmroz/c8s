@@ -6,3 +6,4 @@ authors = ["Martin Mroz <martinmroz@gmail.com>"]
 [dependencies]
 regex = "0.1.58"
 lazy_static = "0.1.15"
+getopts = "0.2.14"
