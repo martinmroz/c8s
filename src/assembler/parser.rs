@@ -159,7 +159,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return The consumed token.
    */
   fn consume_token(&mut self) -> Option<Token<'a>> {
-    let consumed_token = mem::replace(&mut self.current_token, None);
+    let consumed_token = self.current_token.take();
     self.current_token = mem::replace(&mut self.next_token, self.scanner.next());
     consumed_token
   }
