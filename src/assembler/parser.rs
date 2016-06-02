@@ -436,8 +436,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
  @return A list of Nodes for further processing, or an error.
  */
 pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterator<Item=Token<'a>> {
-  let mut parser = Parser::new(scanner);
-  parser.parse_statement_list()
+  Parser::new(scanner).parse_statement_list()
 }
 
 // MARK: - Tests
