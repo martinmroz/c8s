@@ -1,4 +1,6 @@
 
+use std::cell::RefCell;
+
 use ihex::record::Record;
 use ihex::writer;
 
@@ -23,17 +25,32 @@ pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> S
   for range in ranges {
 
     // The range will be sub-divded into chunks of up to 16 bytes, so sub-address must be tracked.
-    let mut address_for_record = range.address_range().start.as_u16();
+    let address_for_current_record = RefCell::new(range.address_range().start.as_u16());
 
-    // Iterate over the data range in groups of up to 16.
-    for data_for_record in range.data().as_slice().chunks(16) {
+    // Sub-divide the range into 16-byte Record::Data objects.
+    records.append(
+      &mut range
+        // Inspect the data in the range.
+        .data()
+        // As a u8 slice.
+        .as_slice()
+        // In groups of 16 bytes.
+        .chunks(16)
+        // Create a tuple of (Record, Length).
+        .map(|chunk| (
+          Record::Data { offset: *address_for_current_record.borrow(), value: Vec::from(chunk) },
+          chunk.len() as u16
+        ))
+        // Increment the address counter by the number of bytes incorporated into the record.
+        .inspect(|&(_, length)| {
+          *address_for_current_record.borrow_mut() += length;
+        })
+        // Discard the length from the tuple.
+        .map(|(record, _)| record)
+        // Collect the records into a Vec<Record>.
+        .collect::<Vec<_>>()
+    );
 
-      // Create a new data record for the chunk.
-      records.push( Record::Data { offset: address_for_record, value: Vec::from(data_for_record) } );
-
-      // Increment the address by the number of bytes emitted in the record.
-      address_for_record += data_for_record.len() as u16;
-    }
   }
 
   // All I8HEX files end in an EOF marker.
@@ -56,7 +73,7 @@ mod tests {
   #[test]
   fn test_i8hex_representation_of_data_ranges_no_ranges() {
     // An empty set of data ranges yields just an EOF marker.
-    assert_eq!(i8hex_representation_of_data_ranges(&[]), String::from(":00000001FF"));
+    assert_eq!(i8hex_representation_of_data_ranges(&[]), String::from(":00000001FF\n"));
   }
 
   #[test]
@@ -75,7 +92,7 @@ mod tests {
       &":100110002146017E17C20001FF5F16002148011928\n" +
       &":10012000194E79234623965778239EDA3F01B2CAA7\n" +
       &":100130003F0156702B5E712B722B732146013421C7\n" +
-      &":00000001FF";
+      &":00000001FF\n";
     assert_eq!(i8hex_rep_average, expected_i8hex_rep_average);
   }
 
@@ -92,7 +109,7 @@ mod tests {
     let expected_i8hex_rep_adjacent = String::new() +
       &":10010000214601360121470136007EFE09D2190140\n" + 
       &":100110002146017E17C20001FF5F16002148011928\n" +
-      &":00000001FF";
+      &":00000001FF\n";
     assert_eq!(i8hex_rep_adjacent, expected_i8hex_rep_adjacent);
   }
 
@@ -109,25 +126,28 @@ mod tests {
     let expected_i8hex_rep_disjoint = String::new() +
       &":10010000214601360121470136007EFE09D2190140\n" + 
       &":100130003F0156702B5E712B722B732146013421C7\n" +
-      &":00000001FF";
+      &":00000001FF\n";
     assert_eq!(i8hex_rep_disjoint, expected_i8hex_rep_disjoint);
   }
 
   #[test]
   fn test_i8hex_representation_of_data_ranges_uneven_ranges() {
-    // Build an uneven pair of data ranges.
+    // Build an uneven set of data ranges.
     let mut range_a = DataRange::new(0x100.as_u12().unwrap());
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19]);
     let mut range_b = DataRange::new(0x130.as_u12().unwrap());
     range_b.append(&vec![0x3F,0x01,0x56,0x70,0x2B,0x5E,0x71,0x2B,0x72,0x2B,0x73,0x21,0x46,0x01,0x34,0x21,0x22]);
+    let mut range_c = DataRange::new(0x200.as_u12().unwrap());
+    range_c.append(&vec![0x3F]);
 
     // Validate the average case yielded the anticipated result.
-    let i8hex_rep = i8hex_representation_of_data_ranges(&[&range_a, &range_b]);
+    let i8hex_rep = i8hex_representation_of_data_ranges(&[&range_a, &range_b, &range_c]);
     let expected_i8hex_rep = String::new() +
       &":0F010000214601360121470136007EFE09D21942\n" + 
       &":100130003F0156702B5E712B722B732146013421C7\n" +
       &":01014000229C\n" +
-      &":00000001FF";
+      &":010200003FBE\n" +
+      &":00000001FF\n";
     assert_eq!(i8hex_rep, expected_i8hex_rep);
   }
 
