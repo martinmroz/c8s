@@ -40,7 +40,7 @@ pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> S
   records.push(Record::EndOfFile);
 
   // Obtain the formatted representation of each record and join with newlines for display.
-  writer::create_object_file_representation(records.as_slice()).unwrap()
+  writer::create_object_file_representation(records.as_slice()).unwrap() + &"\n"
 }
 
 // MARK: - Tests

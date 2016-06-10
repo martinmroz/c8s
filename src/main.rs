@@ -8,6 +8,7 @@ extern crate regex;
 
 use std::env;
 use std::fs::File;
+use std::io;
 use std::io::prelude::*;
 use std::process;
 
@@ -81,12 +82,19 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
   // Convert the data ranges to Intel I8HEX format.
   let result = i8hex_writer::i8hex_representation_of_data_ranges(data_range_refs.as_slice());
 
-  // Open the output file for writing (truncate).
-  let mut output_file = File::create(output_path).unwrap_or_else(|reason| {
-    log_error(format!("Unable to create output file '{}'", output_path));
-    log_error(reason.to_string());
-    process::exit(1);
-  });
+  // Open the output file for writing (truncate) or use stdout if the specified path is `-`.
+  let mut output_file: Box<io::Write> = match output_path {
+    "-" => Box::new(io::stdout()),
+    path @ _ => {
+      Box::new(
+        File::create(output_path).unwrap_or_else(|reason| {
+          log_error(format!("Unable to create output file '{}'", path));
+          log_error(reason.to_string());
+          process::exit(1);
+        })
+      )
+    }
+  };
 
   // Write the result to the output file.
   output_file.write_all(result.as_bytes()).unwrap_or_else(|reason| {
