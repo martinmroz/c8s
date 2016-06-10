@@ -3,6 +3,7 @@
 extern crate lazy_static;
 
 extern crate getopts;
+extern crate ihex;
 extern crate regex;
 
 use std::env;
