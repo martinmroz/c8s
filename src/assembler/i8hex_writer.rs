@@ -25,7 +25,7 @@ pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> S
   for range in ranges {
 
     // The range will be sub-divded into chunks of up to 16 bytes, so sub-address must be tracked.
-    let address_for_current_record = RefCell::new(range.address_range().start.as_u16());
+    let record_address = RefCell::new(range.address_range().start.as_u16());
 
     // Sub-divide the range into 16-byte Record::Data objects.
     records.append(
@@ -36,17 +36,16 @@ pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> S
         .as_slice()
         // In groups of 16 bytes.
         .chunks(16)
-        // Create a tuple of (Record, Length).
-        .map(|chunk| (
-          Record::Data { offset: *address_for_current_record.borrow(), value: Vec::from(chunk) },
-          chunk.len() as u16
-        ))
+        // Create a tuple of (Length, Record).
+        .map(|chunk| {
+          (chunk.len() as u16, Record::Data { offset: *record_address.borrow(), value: Vec::from(chunk) })
+        })
         // Increment the address counter by the number of bytes incorporated into the record.
-        .inspect(|&(_, length)| {
-          *address_for_current_record.borrow_mut() += length;
+        .inspect(|&(length, _)| {
+          *record_address.borrow_mut() += length;
         })
         // Discard the length from the tuple.
-        .map(|(record, _)| record)
+        .map(|(_, record)| record)
         // Collect the records into a Vec<Record>.
         .collect::<Vec<_>>()
     );
