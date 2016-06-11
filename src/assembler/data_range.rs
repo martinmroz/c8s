@@ -1,5 +1,6 @@
 
 use std::cmp;
+use std::fmt;
 use std::ops::Range;
 
 use assembler::u12;
@@ -11,6 +12,14 @@ pub struct DataRange {
   start_address: U12,
   /// The bytes occupying the range.
   data: Vec<u8>
+}
+
+impl fmt::Display for DataRange {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let range = self.address_range();
+    let (first, last) = (range.start.as_usize(), range.end.as_usize() - 1);
+    write!(f, "${:03X}...${:03X} ({} bytes)", first, last, self.len())
+  }
 }
 
 impl DataRange {

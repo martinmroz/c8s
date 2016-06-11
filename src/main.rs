@@ -64,12 +64,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
 
     // Emit overlapping data range information.
     for (a, b) in overlapping_ranges {
-      let range_of_a = a.address_range();
-      let range_of_b = b.address_range();
-      let (a_first, a_last) = (range_of_a.start.as_usize(), range_of_a.end.as_usize() - 1);
-      let (b_first, b_last) = (range_of_b.start.as_usize(), range_of_b.end.as_usize() - 1);
-      log_error(&format!("  range ${:03X}...${:03X} overlaps with:", a_first, a_last));
-      log_error(&format!("  range ${:03X}...${:03X}", b_first, b_last));
+      log_error(&format!("  range {} overlaps with:", a));
+      log_error(&format!("  range {}", b));
     }
 
     process::exit(1);
