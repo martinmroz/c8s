@@ -56,12 +56,12 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
     process::exit(1);
   });
 
-  // TODO: Convert find_overlapping_data_ranges to take &[DataRange].
+  // TODO: Convert find_overlapping_ranges to take &[DataRange].
   // Convert the ranges a vector of references to the ranges themselves.
   let data_range_refs = data_ranges.iter().map(|range| range).collect::<Vec<_>>();
 
   // Verify no overlapping data ranges exist in the result.
-  let overlapping_ranges = data_range::find_overlapping_data_ranges(data_range_refs.as_slice());
+  let overlapping_ranges = data_range::find_overlapping_ranges(data_range_refs.as_slice());
   if overlapping_ranges.len() > 0 {
     log_error(String::from("Input file specifies overlapping data ranges."));
     log_error(String::from("Data from one section has overflowed into the adjacent."));

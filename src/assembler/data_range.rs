@@ -90,7 +90,7 @@ impl DataRange {
  @param ranges A list of data ranges.
  @return A list of pairs of overlapping data ranges.
  */
-pub fn find_overlapping_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> Vec<(&'a DataRange, &'a DataRange)> {
+pub fn find_overlapping_ranges<'a>(ranges: &'a [&'a DataRange]) -> Vec<(&'a DataRange, &'a DataRange)> {
   let mut overlapping_ranges = Vec::new();
 
   /*
@@ -245,7 +245,7 @@ mod tests {
   }
 
   #[test]
-  fn test_find_overlapping_data_ranges() {
+  fn test_find_overlapping_ranges() {
     /*               */
     /*    0123456789 */
     /* A: ++++++++++ */ let range_a = range_with_start_and_length(0, 10);
@@ -256,29 +256,29 @@ mod tests {
     /*               */
 
     // Zero ranges cannot overlap.
-    assert_eq!(find_overlapping_data_ranges(&[]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[]), vec![]);
 
     // No one range can overlap.
-    assert_eq!(find_overlapping_data_ranges(&[&range_a]), vec![]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_b]), vec![]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_c]), vec![]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_d]), vec![]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_e]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_a]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_b]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_c]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_d]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_e]), vec![]);
 
     // Non-overlapping data ranges.
-    assert_eq!(find_overlapping_data_ranges(&[&range_b, &range_c]), vec![]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_b, &range_e]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_b, &range_c]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[&range_b, &range_e]), vec![]);
 
     // One overlapping range (including when the same range is represented twice).
-    assert_eq!(find_overlapping_data_ranges(&[&range_a, &range_a]), vec![(&range_a, &range_a)]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_a, &range_b]), vec![(&range_a, &range_b)]);
-    assert_eq!(find_overlapping_data_ranges(&[&range_a, &range_c]), vec![(&range_a, &range_c)]);
+    assert_eq!(find_overlapping_ranges(&[&range_a, &range_a]), vec![(&range_a, &range_a)]);
+    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b]), vec![(&range_a, &range_b)]);
+    assert_eq!(find_overlapping_ranges(&[&range_a, &range_c]), vec![(&range_a, &range_c)]);
 
     // One overlapping range when the zero-range is also included.
-    assert_eq!(find_overlapping_data_ranges(&[&range_a, &range_b, &range_e]), vec![(&range_a, &range_b)]);
+    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b, &range_e]), vec![(&range_a, &range_b)]);
 
     // Test all ranges to find the overlapping pairs.
-    assert_eq!(find_overlapping_data_ranges(&[&range_a, &range_b, &range_c, &range_d, &range_e]), 
+    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b, &range_c, &range_d, &range_e]), 
       vec![
         (&range_a, &range_b),
         (&range_a, &range_c),

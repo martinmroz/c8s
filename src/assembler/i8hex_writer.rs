@@ -17,7 +17,7 @@ use assembler::data_range::DataRange;
  @return The complete I8HEX record (including EOF) of the given data ranges.
  */
 pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [&'a DataRange]) -> String {
-  assert!(data_range::find_overlapping_data_ranges(ranges).len() == 0);
+  assert!(data_range::find_overlapping_ranges(ranges).len() == 0);
 
   // All records are collected into a list.
   let mut records = Vec::<Record>::new();
