@@ -56,12 +56,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
     process::exit(1);
   });
 
-  // TODO: Convert find_overlapping_ranges to take &[DataRange].
-  // Convert the ranges a vector of references to the ranges themselves.
-  let data_range_refs = data_ranges.iter().map(|range| range).collect::<Vec<_>>();
-
   // Verify no overlapping data ranges exist in the result.
-  let overlapping_ranges = data_range::find_overlapping_ranges(data_range_refs.as_slice());
+  let overlapping_ranges = data_range::find_overlapping_ranges(data_ranges.as_slice());
   if overlapping_ranges.len() > 0 {
     log_error("Input file specifies overlapping data ranges.");
     log_error("Data from one section has overflowed into the adjacent.");
@@ -80,7 +76,7 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
   }
 
   // Convert the data ranges to Intel I8HEX format.
-  let result = i8hex_writer::i8hex_representation_of_data_ranges(data_range_refs.as_slice());
+  let result = i8hex_writer::i8hex_representation_of_data_ranges(data_ranges.as_slice());
 
   // Open the output file for writing (truncate) or use stdout if the specified path is `-`.
   let mut output_file: Box<io::Write> = match output_path {

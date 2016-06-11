@@ -5,7 +5,7 @@ use std::ops::Range;
 use assembler::u12;
 use assembler::u12::*;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub struct DataRange {
   /// The first address populated by the bytes in the range.
   start_address: U12,
@@ -15,10 +15,8 @@ pub struct DataRange {
 
 impl DataRange {
   
-  /**
-   @param start_address The address of the first element in the data range in the result.
-   @return A new data range from the start address with zero elements.
-   */
+  /// Designated initializer for a `DataRange` starting at `start_address`. 
+  /// The new data range is initially empty.
   pub fn new(start_address: U12) -> Self {
     DataRange {
       start_address: start_address,
@@ -26,23 +24,17 @@ impl DataRange {
     }
   }
 
-  /**
-   @return The number of bytes in the data range.
-   */
+  /// The number of bytes of data in the receiver.
   pub fn len(&self) -> usize {
     self.data.len()
   }
 
-  /**
-   @return An immutable reference to the data underlying the range.
-   */
+  /// An immutable reference to the data in the receiver.
   pub fn data(&self) -> &Vec<u8> {
     &self.data
   }
 
-  /**
-   @return A half-open range { address | start <= address < end } representing addresses in the range.
-   */
+  /// A half-open range `{ address | start <= address < end }` representing addresses covered by the receiver.
   pub fn address_range(&self) -> Range<U12> {    
     Range {
       start: self.start_address,
@@ -50,18 +42,15 @@ impl DataRange {
     }
   }
 
-  /**
-   @return The number of bytes remaining to store data in the range.
-   */
+  /// Returns the number of bytes remaining to store data in the receiver.
   pub fn bytes_remaining(&self) -> usize {
     let total_space_in_range = (u12::MAX - self.start_address).as_usize() + 1;
     total_space_in_range - self.len()
   }
 
-  /**
-   Appends the slice to the end of the data range. Checks for capacity in advance.
-   @param data The bytes to append to the data range.
-   */
+  /// Appends the bytes in `data` to the end of the range. Checks to ensure the
+  /// capacity of the receiver is sufficient without causing the U12 space to wrap around.
+  /// Returns `true` on success.
   pub fn append(&mut self, data: &[u8]) -> bool {
     if self.bytes_remaining() >= data.len() {
       self.data.extend_from_slice(data);
@@ -71,9 +60,7 @@ impl DataRange {
     }
   }
 
-  /**
-   @return YES if the supplied range intersects the receiver.
-   */
+  /// Returns `true` if the receiver intersects with `range`.
   pub fn intersects(&self, range: &DataRange) -> bool {
     let lhs_range =  self.address_range();
     let rhs_range = range.address_range();
@@ -86,11 +73,8 @@ impl DataRange {
 
 // MARK: - Public Functions
 
-/**
- @param ranges A list of data ranges.
- @return A list of pairs of overlapping data ranges.
- */
-pub fn find_overlapping_ranges<'a>(ranges: &'a [&'a DataRange]) -> Vec<(&'a DataRange, &'a DataRange)> {
+/// Returns a list of pairs of overlapping ranges in `ranges`.
+pub fn find_overlapping_ranges<'a>(ranges: &'a [DataRange]) -> Vec<(&'a DataRange, &'a DataRange)> {
   let mut overlapping_ranges = Vec::new();
 
   /*
@@ -100,8 +84,8 @@ pub fn find_overlapping_ranges<'a>(ranges: &'a [&'a DataRange]) -> Vec<(&'a Data
    */
   for i in 0..ranges.len() {
     for j in i+1..ranges.len() {
-      let lhs = ranges[i];
-      let rhs = ranges[j];
+      let lhs = &ranges[i];
+      let rhs = &ranges[j];
 
       if lhs.intersects(rhs) {
         overlapping_ranges.push((lhs, rhs));
@@ -248,50 +232,50 @@ mod tests {
   fn test_find_overlapping_ranges() {
     /*               */
     /*    0123456789 */
-    /* A: ++++++++++ */ let range_a = range_with_start_and_length(0, 10);
-    /* B: +++======= */ let range_b = range_with_start_and_length(0,  3);
-    /* C: =======+++ */ let range_c = range_with_start_and_length(7,  3);
-    /* D: ==++++++== */ let range_d = range_with_start_and_length(2,  6);
-    /* E: ========== */ let range_e = range_with_start_and_length(0,  0);
+    /* A: ++++++++++ */ let range_a = || { range_with_start_and_length(0, 10) };
+    /* B: +++======= */ let range_b = || { range_with_start_and_length(0,  3) };
+    /* C: =======+++ */ let range_c = || { range_with_start_and_length(7,  3) };
+    /* D: ==++++++== */ let range_d = || { range_with_start_and_length(2,  6) };
+    /* E: ========== */ let range_e = || { range_with_start_and_length(0,  0) };
     /*               */
 
     // Zero ranges cannot overlap.
     assert_eq!(find_overlapping_ranges(&[]), vec![]);
 
     // No one range can overlap.
-    assert_eq!(find_overlapping_ranges(&[&range_a]), vec![]);
-    assert_eq!(find_overlapping_ranges(&[&range_b]), vec![]);
-    assert_eq!(find_overlapping_ranges(&[&range_c]), vec![]);
-    assert_eq!(find_overlapping_ranges(&[&range_d]), vec![]);
-    assert_eq!(find_overlapping_ranges(&[&range_e]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_a()]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_b()]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_c()]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_d()]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_e()]), vec![]);
 
     // Non-overlapping data ranges.
-    assert_eq!(find_overlapping_ranges(&[&range_b, &range_c]), vec![]);
-    assert_eq!(find_overlapping_ranges(&[&range_b, &range_e]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_b(), range_c()]), vec![]);
+    assert_eq!(find_overlapping_ranges(&[range_b(), range_e()]), vec![]);
 
     // One overlapping range (including when the same range is represented twice).
-    assert_eq!(find_overlapping_ranges(&[&range_a, &range_a]), vec![(&range_a, &range_a)]);
-    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b]), vec![(&range_a, &range_b)]);
-    assert_eq!(find_overlapping_ranges(&[&range_a, &range_c]), vec![(&range_a, &range_c)]);
+    assert_eq!(find_overlapping_ranges(&[range_a(), range_a()]), vec![(&range_a(), &range_a())]);
+    assert_eq!(find_overlapping_ranges(&[range_a(), range_b()]), vec![(&range_a(), &range_b())]);
+    assert_eq!(find_overlapping_ranges(&[range_a(), range_c()]), vec![(&range_a(), &range_c())]);
 
-    // One overlapping range when the zero-range is also included.
-    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b, &range_e]), vec![(&range_a, &range_b)]);
+    // // One overlapping range when the zero-range is also included.
+    assert_eq!(find_overlapping_ranges(&[range_a(), range_b(), range_e()]), vec![(&range_a(), &range_b())]);
 
     // Test all ranges to find the overlapping pairs.
-    assert_eq!(find_overlapping_ranges(&[&range_a, &range_b, &range_c, &range_d, &range_e]), 
+    assert_eq!(find_overlapping_ranges(&[range_a(), range_b(), range_c(), range_d(), range_e()]),
       vec![
-        (&range_a, &range_b),
-        (&range_a, &range_c),
-        (&range_a, &range_d),
-        (&range_b, &range_d),
-        (&range_c, &range_d)
+        (&range_a(), &range_b()),
+        (&range_a(), &range_c()),
+        (&range_a(), &range_d()),
+        (&range_b(), &range_d()),
+        (&range_c(), &range_d())
       ]
     );
   }
 
   // MARK: - Helper Methods
 
-  /// Construct a new zero-filled range at the start address provided with the length provided.
+  /// Constructs a new zero-filled range at the start address provided with the length provided.
   fn range_with_start_and_length(start: usize, length: usize) -> DataRange {
     let mut range = DataRange::new(start.as_u12().unwrap());
     let data: Vec<u8> = repeat(0u8).take(length).collect();
