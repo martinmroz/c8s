@@ -1,8 +1,9 @@
 
 use std::fmt;
 
+use twelve_bit::u12::*;
+
 use assembler::parser::Literal;
-use assembler::u12::*;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum Directive {
@@ -15,7 +16,7 @@ pub enum Directive {
 impl fmt::Display for Directive {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      &Directive::Org(location) => write!(f, ".{} ${:3X}",     names::ORG, location.as_usize()),
+      &Directive::Org(location) => write!(f, ".{} ${:3X}",     names::ORG, usize::from(location)),
       &Directive::Db(ref bytes) => write!(f, ".{} [{} bytes]", names::DB,  bytes.len())
     }
   }
@@ -48,7 +49,7 @@ impl<'a> Directive {
 
       return match arguments[0] {
         Literal::Numeric(a) if a <= 0xFFF => {
-          Ok(Directive::Org(a.as_u12().unwrap()))
+          Ok(Directive::Org(a.unchecked_into()))
         }
         _ => {
           Err(format!("Directive .{} requires 1 numeric literal in the range $000-$FFF.", names::ORG))
@@ -118,8 +119,9 @@ impl<'a> Directive {
 #[cfg(test)]
 mod tests {
 
+  use twelve_bit::u12;
+
   use assembler::parser::Literal;
-  use assembler::u12;
 
   use super::*;
 

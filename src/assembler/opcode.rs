@@ -1,7 +1,7 @@
 
 use std::fmt;
 
-use assembler::u12::*;
+use twelve_bit::u12::*;
 
 // TODO: mm: SHL and SHR ignore their Vy parameters on interpretation.
 
@@ -57,7 +57,7 @@ impl Opcode {
       ((instruction & 0x000F) >>  0) as u8
     );
 
-    let imm12 = (instruction & 0x0FFF).as_u12().unwrap();
+    let imm12 = (instruction & 0x0FFF).unchecked_into();
     let imm8: u8 = (instruction & 0x00FF) as u8;
     let imm4: u8 = (instruction & 0x000F) as u8;
     let register_x = nibbles.1;
@@ -111,8 +111,8 @@ impl Opcode {
       Opcode::RET                                                     => { format!("ret") }
       Opcode::TRAP                                                    => { format!("trap") }
       Opcode::TRAPRET                                                 => { format!("trapret") }
-      Opcode::JP              { target }                              => { format!("jp ${:3x}", target.as_u16()) }
-      Opcode::CALL            { target }                              => { format!("call ${:3x}", target.as_u16()) }
+      Opcode::JP              { target }                              => { format!("jp ${:3x}", u16::from(target)) }
+      Opcode::CALL            { target }                              => { format!("call ${:3x}", u16::from(target)) }
       Opcode::SE_IMMEDIATE    { register_x: x, value }                => { format!("se v{:1x}, ${:2x}", x, value) }
       Opcode::SNE_IMMEDIATE   { register_x: x, value }                => { format!("sne v{:1x}, ${:2x}", x, value) }
       Opcode::SE_REGISTER     { register_x: x, register_y: y }        => { format!("se v{:1x}, v{:1x}", x, y) }
@@ -128,8 +128,8 @@ impl Opcode {
       Opcode::SHR             { register_x: x, register_y: y }        => { format!("shr v{:1x}, v{:1x}", x, y) }
       Opcode::SUBN            { register_x: x, register_y: y }        => { format!("subn v{:1x}, v{:1x}", x, y) }
       Opcode::SHL             { register_x: x, register_y: y }        => { format!("shl v{:1x}, v{:1x}", x, y) }
-      Opcode::LD_I            { value }                               => { format!("ld i, ${:3x}", value.as_u16()) }
-      Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", value.as_u16()) }
+      Opcode::LD_I            { value }                               => { format!("ld i, ${:3x}", u16::from(value)) }
+      Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", u16::from(value)) }
       Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, ${:2x}", x, mask) }
       Opcode::DRW             { register_x: x, register_y: y, bytes}  => { format!("drw v{:1x}, v{:1x}, ${:1x}", x, y, bytes) }
       Opcode::SE_K            { register_x: x }                       => { format!("se v{:1x}, k", x) }
@@ -209,7 +209,7 @@ fn format_instruction_imm12(hi4: u8, imm12: U12) -> u16 {
    */
   assert!(  hi4 <= 0xF);
 
-  ((hi4 as u16) << 12) | (imm12.as_u16())
+  ((hi4 as u16) << 12) | u16::from(imm12)
 }
 
 fn format_instruction_x_imm8(hi4: u8, x: u8, imm8: u8) -> u16 {

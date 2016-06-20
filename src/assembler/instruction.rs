@@ -1,9 +1,10 @@
 
 use std::collections::BTreeMap;
 
+use twelve_bit::u12::*;
+
 use assembler::opcode::Opcode;
 use assembler::parser::InstructionField;
-use assembler::u12::*;
 
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
 pub struct Instruction(Opcode);
@@ -27,9 +28,10 @@ fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, U12>
  @return A result consisting of the low 8 bits of the 12-bit literal or an explanation as to why conversion failed.
  */
 fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
-  match literal.as_u8() {
+  let literal_value: Option<u8> = literal.failable_into();
+  match literal_value {
     Some(value) => Ok(value),
-           None => Err(format!("Found 12-bit numeric literal ${:X}, expecting 8-bit value.", literal.as_usize()))
+           None => Err(format!("Found 12-bit numeric literal ${:X}, expecting 8-bit value.", usize::from(literal)))
   }
 }
 
@@ -39,12 +41,13 @@ fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
  @return A result consisting of the low 4 bits of the 12-bit literal or an explanation as to why conversion failed.
  */
 fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
-  match literal.as_u8() {
+  let literal_value: Option<u8> = literal.failable_into();
+  match literal_value {
     Some(value) if value < 16 => {
       Ok(value)
     }
     _ => {
-      Err(format!("Found 8/12-bit numeric literal ${:X}, expecting 4-bit value.", literal.as_usize()))
+      Err(format!("Found 8/12-bit numeric literal ${:X}, expecting 4-bit value.", usize::from(literal)))
     }
   }
 }
@@ -283,10 +286,11 @@ mod tests {
 
   use std::collections::BTreeMap;
 
+  use twelve_bit::u12;
+  use twelve_bit::u12::*;
+
   use assembler::opcode::Opcode;
   use assembler::parser::InstructionField;
-  use assembler::u12;
-  use assembler::u12::*;
 
   use super::*;
 
@@ -437,7 +441,7 @@ mod tests {
     assert_eq!(se_imm.0, Opcode::SE_IMMEDIATE { register_x: 1, value: 0xFF });
 
     // Immediate fields for se vX, $nn is limited to 8 bits.
-    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let immediate_field_invalid = InstructionField::NumericLiteral(u12![0x100]);
     let invalid_se_imm = Instruction::from_mnemonic_and_parameters("se", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_se_imm.is_err(), true);
     assert_eq!(invalid_se_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
@@ -467,7 +471,7 @@ mod tests {
     assert_eq!(sne_imm.0, Opcode::SNE_IMMEDIATE { register_x: 1, value: 0xFF });
 
     // Immediate fields for sne vX, $nn is limited to 8 bits.
-    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let immediate_field_invalid = InstructionField::NumericLiteral(u12![0x100]);
     let invalid_sne_imm = Instruction::from_mnemonic_and_parameters("sne", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_sne_imm.is_err(), true);
     assert_eq!(invalid_sne_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
@@ -497,7 +501,7 @@ mod tests {
     assert_eq!(ld_imm.0, Opcode::LD_IMMEDIATE { register_x: 1, value: 0xFF });
 
     // Immediate fields for ld vX, $nn is limited to 8 bits.
-    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let immediate_field_invalid = InstructionField::NumericLiteral(u12![0x100]);
     let invalid_ld_imm = Instruction::from_mnemonic_and_parameters("ld", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_ld_imm.is_err(), true);
     assert_eq!(invalid_ld_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
@@ -547,7 +551,7 @@ mod tests {
     assert_eq!(add_imm.0, Opcode::ADD_IMMEDIATE { register_x: 1, value: 0xFF });
 
     // Immediate fields for add vX, $nn is limited to 8 bits.
-    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let immediate_field_invalid = InstructionField::NumericLiteral(u12![0x100]);
     let invalid_add_imm = Instruction::from_mnemonic_and_parameters("add", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_add_imm.is_err(), true);
     assert_eq!(invalid_add_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));
@@ -612,7 +616,7 @@ mod tests {
     assert_eq!(rnd_imm.0, Opcode::RND { register_x: 1, mask: 0xFF });
 
     // Immediate fields for rnd vX, $nn is limited to 8 bits.
-    let immediate_field_invalid = InstructionField::NumericLiteral(0x100.as_u12().unwrap());
+    let immediate_field_invalid = InstructionField::NumericLiteral(u12![0x100]);
     let invalid_rnd_imm = Instruction::from_mnemonic_and_parameters("rnd", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_rnd_imm.is_err(), true);
     assert_eq!(invalid_rnd_imm.unwrap_err(), String::from("Found 12-bit numeric literal $100, expecting 8-bit value."));

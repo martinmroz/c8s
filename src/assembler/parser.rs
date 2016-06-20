@@ -2,10 +2,11 @@
 use std::fmt;
 use std::mem;
 
+use twelve_bit::u12::*;
+
 use assembler::source_file_location::SourceFileLocation;
 use assembler::token::Token;
 use assembler::token::display_names;
-use assembler::u12::*;
 
 // MARK: - Abstract Syntax List
 
@@ -94,7 +95,7 @@ impl<'a> fmt::Display for InstructionField<'a> {
    */
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      &InstructionField::NumericLiteral(value)      => write!(f, "${:x}", value.as_usize()),
+      &InstructionField::NumericLiteral(value)      => write!(f, "${:x}", usize::from(value)),
       &InstructionField::GeneralPurposeRegister(r)  => write!(f, "v{:x}", r),
       &InstructionField::DelayTimer                 => write!(f, "dt"),
       &InstructionField::SoundTimer                 => write!(f, "st"),
@@ -295,7 +296,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // A numeric literal parameter was matched.
       Some(Token::NumericLiteral(number, _)) => {
-        let literal = InstructionField::NumericLiteral(number.as_u12().unwrap());
+        let literal = InstructionField::NumericLiteral(number.unchecked_into());
         let _ = self.consume_token();
         literal
       }
@@ -444,9 +445,10 @@ pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterat
 #[cfg(test)]
 mod tests {
   
+  use twelve_bit::u12::*;
+  
   use assembler::source_file_location::SourceFileLocation;
   use assembler::scanner::Scanner;
-  use assembler::u12::*;
 
   use super::Parser;
   use super::{DirectiveData, InstructionData, LabelData};
@@ -553,7 +555,7 @@ mod tests {
 
     // A field list can contain a single item.
     parser = Parser::new(Scanner::new("-", "$00\n"));
-    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(U12::zero())]));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::NumericLiteral(u12![0])]));
     parser = Parser::new(Scanner::new("-", "v1\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::GeneralPurposeRegister(1)]));
     parser = Parser::new(Scanner::new("-", "dt\n"));

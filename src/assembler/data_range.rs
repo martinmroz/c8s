@@ -3,8 +3,8 @@ use std::cmp;
 use std::fmt;
 use std::ops::Range;
 
-use assembler::u12;
-use assembler::u12::*;
+use twelve_bit::u12;
+use twelve_bit::u12::*;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct DataRange {
@@ -17,7 +17,8 @@ pub struct DataRange {
 impl fmt::Display for DataRange {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     let range = self.address_range();
-    let (first, last) = (range.start.as_usize(), range.end.as_usize() - 1);
+    let first = usize::from(range.start);
+    let last = usize::from(range.end) - 1;
     write!(f, "${:03X}...${:03X} ({} bytes)", first, last, self.len())
   }
 }
@@ -47,13 +48,13 @@ impl DataRange {
   pub fn address_range(&self) -> Range<U12> {    
     Range {
       start: self.start_address,
-        end: self.start_address.wrapping_add(self.len().as_u12().unwrap())
+        end: self.start_address.wrapping_add(self.len().unchecked_into())
     }
   }
 
   /// Returns the number of bytes remaining to store data in the receiver.
   pub fn bytes_remaining(&self) -> usize {
-    let total_space_in_range = (u12::MAX - self.start_address).as_usize() + 1;
+    let total_space_in_range = usize::from((u12::MAX - self.start_address)) + 1;
     total_space_in_range - self.len()
   }
 
@@ -114,17 +115,17 @@ mod tests {
 
   use super::*;
 
-  use assembler::u12;
-  use assembler::u12::*;
+  use twelve_bit::u12;
+  use twelve_bit::u12::*;
 
   #[test]
   fn test_empty_ranges() {
-    let zero_range = DataRange::new(U12::zero());
+    let zero_range = DataRange::new(u12![0]);
     assert_eq!(zero_range.len(), 0);
     assert_eq!(zero_range.bytes_remaining(), 4096);
-    assert_eq!(zero_range.address_range(), U12::zero() .. U12::zero());
+    assert_eq!(zero_range.address_range(), u12![0] .. u12![0]);
 
-    let half_address = 0x800.as_u12().unwrap();
+    let half_address = u12![0x800];
     let half_range = DataRange::new(half_address);
     assert_eq!(half_range.len(), 0);
     assert_eq!(half_range.bytes_remaining(), 2048);
@@ -138,7 +139,7 @@ mod tests {
 
   #[test]
   fn test_append_within_range() {
-    let program_space_start = 0x200.as_u12().unwrap();
+    let program_space_start = u12![0x200];
     let mut program_space = DataRange::new(program_space_start);
     assert_eq!(program_space.len(), 0);
     assert_eq!(program_space.bytes_remaining(), 3584);
@@ -149,14 +150,14 @@ mod tests {
     assert_eq!(program_space.append(one_byte_slice), true);
     assert_eq!(program_space.len(), 1);
     assert_eq!(program_space.bytes_remaining(), 3583);
-    assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(U12::from(1)));
+    assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(u12![1]));
 
     // Append a single byte to the data range.
     let two_byte_slice: &[u8] = &[2, 3];
     assert_eq!(program_space.append(two_byte_slice), true);
     assert_eq!(program_space.len(), 3);
     assert_eq!(program_space.bytes_remaining(), 3581);
-    assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(U12::from(3)));
+    assert_eq!(program_space.address_range(), program_space_start .. program_space_start.wrapping_add(u12![3]));
 
     // Validate the data was appended.
     assert_eq!(program_space.data(), &vec![1,2,3]);
@@ -286,7 +287,7 @@ mod tests {
 
   /// Constructs a new zero-filled range at the start address provided with the length provided.
   fn range_with_start_and_length(start: usize, length: usize) -> DataRange {
-    let mut range = DataRange::new(start.as_u12().unwrap());
+    let mut range = DataRange::new(start.unchecked_into());
     let data: Vec<u8> = repeat(0u8).take(length).collect();
     range.append(data.as_slice());
     range

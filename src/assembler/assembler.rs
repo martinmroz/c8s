@@ -2,12 +2,13 @@
 use std::collections::BTreeMap;
 use std::mem;
 
+use twelve_bit::u12::*;
+
 use assembler::data_range::DataRange;
 use assembler::directive::Directive;
 use assembler::instruction::Instruction;
 use assembler::parser::Node;
 use assembler::source_file_location::SourceFileLocation;
-use assembler::u12::*;
 
 // MARK: - Constants
 
@@ -33,7 +34,7 @@ fn format_semantic_error(location: &SourceFileLocation, description: String) -> 
  */
 fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U12>, String> {
   let mut label_address_map = BTreeMap::new();
-  let mut current_address = U12::zero();
+  let mut current_address = u12![0];
 
   // Define all labels and process '.org' directives.
   for node in syntax_list.iter() {
@@ -46,7 +47,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
         };
 
         // Ensure the directive is not too large to emit.
-        let directive_size = match directive.size().as_u12() {
+        let directive_size = match directive.size().failable_into() {
           Some(size) => size,
           None => {
             let reason = format!("Directive ({}) size {} exceeds 4096 bytes.", directive, directive.size());
@@ -100,7 +101,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
 fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, U12>) -> Result<Vec<DataRange>, String> {
   let mut data_ranges = Vec::new();
-  let mut current_range = DataRange::new(U12::zero());
+  let mut current_range = DataRange::new(u12![0]);
 
   for node in syntax_list {
     match node {
@@ -167,9 +168,10 @@ pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String
 #[cfg(test)]
 mod tests {
   
+  use twelve_bit::u12::*;
+  
   use assembler::parser::*;
   use assembler::source_file_location::SourceFileLocation;
-  use assembler::u12::*;
 
   use super::define_labels;
 
@@ -231,9 +233,9 @@ mod tests {
     // Verify that the labels are defined as expected.
     let label_map = result.unwrap();
     assert_eq!(label_map.len(), 3);
-    assert_eq!(label_map.get("label1").unwrap(), &(0x100.as_u12().unwrap()));
-    assert_eq!(label_map.get("label2").unwrap(), &(0x101.as_u12().unwrap()));
-    assert_eq!(label_map.get("label3").unwrap(), &(0x103.as_u12().unwrap()));
+    assert_eq!(label_map.get("label1").unwrap(), &(u12![0x100]));
+    assert_eq!(label_map.get("label2").unwrap(), &(u12![0x101]));
+    assert_eq!(label_map.get("label3").unwrap(), &(u12![0x103]));
   }
 
   #[test]

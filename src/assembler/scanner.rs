@@ -35,6 +35,7 @@ pub struct Error<'a> {
 }
 
 impl<'a> Error<'a> {
+  /// Returns a new `Scanner::Error` instance for an error at `location` with `failure_reason`.
   fn new(location: SourceFileLocation<'a>, failure_reason: FailureReason<'a>) -> Self {
     Error {
       location: location,
