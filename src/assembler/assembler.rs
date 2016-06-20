@@ -17,7 +17,7 @@ lazy_static! {
 
 // MARK: - Helper Methods
 
-fn format_semantic_error<'a>(location: &'a SourceFileLocation, description: String) -> String {
+fn format_semantic_error(location: &SourceFileLocation, description: String) -> String {
   format!("{}: error: {}", location, description)
 }
 

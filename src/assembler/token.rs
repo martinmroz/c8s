@@ -4,7 +4,7 @@ use std::fmt;
 
 use assembler::source_file_location::SourceFileLocation;
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Token<'a> {
   /// A single-line comment. Value includes ';' but not the newline.
   SingleLineComment(&'a str, SourceFileLocation<'a>),
@@ -31,16 +31,16 @@ impl<'a> Token<'a> {
    @return A reference to the source file location corresponding to any variant of Token.
    */
   pub fn location(&self) -> &SourceFileLocation<'a> {
-    match *self {
-      Token::SingleLineComment(_, ref loc)    => loc,
-      Token::DirectiveMarker(ref loc)         => loc,
-      Token::Identifier(_, ref loc)           => loc,
-      Token::LabelMarker(ref loc)             => loc,
-      Token::StringLiteral(_, ref loc)        => loc,
-      Token::NumericLiteral(_, ref loc)       => loc,
-      Token::Comma(ref loc)                   => loc,
-      Token::Newline(ref loc)                 => loc,
-      Token::Error(_, ref loc)                => loc
+    match self {
+      &Token::SingleLineComment(_, ref loc)   => loc,
+      &Token::DirectiveMarker(ref loc)        => loc,
+      &Token::Identifier(_, ref loc)          => loc,
+      &Token::LabelMarker(ref loc)            => loc,
+      &Token::StringLiteral(_, ref loc)       => loc,
+      &Token::NumericLiteral(_, ref loc)      => loc,
+      &Token::Comma(ref loc)                  => loc,
+      &Token::Newline(ref loc)                => loc,
+      &Token::Error(_, ref loc)               => loc
     }
   }
 }
@@ -53,16 +53,16 @@ impl<'a> fmt::Display for Token<'a> {
    @return A result representing the formatted receiver or a failure to write into the Formatter.
    */
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match *self {
-      Token::SingleLineComment(_, _)          => write!(f, "{}", display_names::SINGLE_LINE_COMMENT),
-      Token::DirectiveMarker(_)               => write!(f, "{}", display_names::DIRECTIVE_MARKER),
-      Token::LabelMarker(_)                   => write!(f, "{}", display_names::LABEL_MARKER),
-      Token::Comma(_)                         => write!(f, "{}", display_names::COMMA),
-      Token::Newline(_)                       => write!(f, "{}", display_names::NEWLINE),
-      Token::Identifier(ref value, _)         => write!(f, "{} ({})", display_names::IDENTIFIER, value),
-      Token::StringLiteral(ref value, _)      => write!(f, "{} (\"{}\")", display_names::STRING_LITERAL, value),
-      Token::NumericLiteral(ref value, _)     => write!(f, "{} ({} / ${:X})", display_names::NUMERIC_LITERAL, value, value),
-      Token::Error(ref reason, _)             => write!(f, "{}", reason)
+    match self {
+      &Token::SingleLineComment(_, _)         => write!(f, "{}", display_names::SINGLE_LINE_COMMENT),
+      &Token::DirectiveMarker(_)              => write!(f, "{}", display_names::DIRECTIVE_MARKER),
+      &Token::LabelMarker(_)                  => write!(f, "{}", display_names::LABEL_MARKER),
+      &Token::Comma(_)                        => write!(f, "{}", display_names::COMMA),
+      &Token::Newline(_)                      => write!(f, "{}", display_names::NEWLINE),
+      &Token::Identifier(ref value, _)        => write!(f, "{} ({})", display_names::IDENTIFIER, value),
+      &Token::StringLiteral(ref value, _)     => write!(f, "{} (\"{}\")", display_names::STRING_LITERAL, value),
+      &Token::NumericLiteral(ref value, _)    => write!(f, "{} ({} / ${:X})", display_names::NUMERIC_LITERAL, value, value),
+      &Token::Error(ref reason, _)            => write!(f, "{}", reason)
     }
   }
 }
