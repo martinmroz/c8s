@@ -28,8 +28,7 @@ fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, U12>
  @return A result consisting of the low 8 bits of the 12-bit literal or an explanation as to why conversion failed.
  */
 fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
-  let literal_value: Option<u8> = literal.failable_into();
-  match literal_value {
+  match literal.failable_into() {
     Some(value) => Ok(value),
            None => Err(format!("Found 12-bit numeric literal ${:X}, expecting 8-bit value.", usize::from(literal)))
   }
@@ -41,8 +40,7 @@ fn numeric_literal_to_8_bit_field(literal: U12) -> Result<u8, String> {
  @return A result consisting of the low 4 bits of the 12-bit literal or an explanation as to why conversion failed.
  */
 fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, String> {
-  let literal_value: Option<u8> = literal.failable_into();
-  match literal_value {
+  match literal.failable_into() {
     Some(value) if value < 16 => {
       Ok(value)
     }
