@@ -27,10 +27,13 @@ pub enum ScannerError<'a> {
 }
 
 impl<'a> Error for ScannerError<'a> {
+
+  /// Returns a string slice to a general description of the scanner error.
+  /// No specific information is contained.
   fn description(&self) -> &str {
     match self {
-      &ScannerError::InvalidStringLiteral(_)        => "Invalid string literal encountered",
-      &ScannerError::InvalidHexadecimalLiteral(_)   => "Invalid hexadecimal literal encountered",
+      &ScannerError::InvalidStringLiteral(_)        => "Invalid quoted string literal",
+      &ScannerError::InvalidHexadecimalLiteral(_)   => "Invalid hexadecimal literal starting with ($)",
       &ScannerError::DecimalLiteralOutOfRange(_,_)  => "Decimal literal not in range 0...4095",
       &ScannerError::InvalidDecimalLiteral(_)       => "Invalid decimal literal encountered",
       &ScannerError::InvalidIdentifier(_)           => "Invalid identifier encountered",
@@ -38,11 +41,24 @@ impl<'a> Error for ScannerError<'a> {
       &ScannerError::InvalidCharacter(_,_)          => "Invalid character encountered",
     }
   }
+
 }
 
 impl<'a> fmt::Display for ScannerError<'a> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "{}", self.description())
+    match self {
+      &ScannerError::DecimalLiteralOutOfRange(_, literal)  => {
+        write!(f, "Decimal literal {} not in range (0...4095).", literal)
+      }
+
+      &ScannerError::InvalidCharacter(_, character) => {
+        write!(f, "Invalid character '{}'.", character)
+      }
+
+      _ => {
+        write!(f, "{}.", self.description())
+      }
+    }
   }
 }
 
@@ -330,7 +346,7 @@ impl<'a> Scanner<'a> {
   /**
    @return The next token, or None if the scanner has reached the end of the input.
    */
-  pub fn next_token(&mut self) -> Option<Result<Token<'a>, ScannerError<'a>>> {
+  pub fn next_result(&mut self) -> Option<Result<Token<'a>, ScannerError<'a>>> {
     self.consume_whitespace();
     if self.is_at_end() {
       return None;
@@ -384,13 +400,13 @@ impl<'a> Scanner<'a> {
 impl<'a> Iterator for Scanner<'a> {
   type Item = Token<'a>;
   fn next(&mut self) -> Option<Self::Item> {
-    self.next_token().map(|result|
+    self.next_result().map(|result|
       match result {
         Ok(token) => token,
 
         // Convert the ScannerError into a deprecated Token::Error.
         Err(scanner_error) => {
-          let reason = scanner_error.description().to_string();
+          let reason = format!("{}", scanner_error);
           let location = match scanner_error {
             ScannerError::InvalidStringLiteral(location)          => location,
             ScannerError::InvalidHexadecimalLiteral(location)     => location,
@@ -518,7 +534,7 @@ mod tests {
     
     scanner = Scanner::new("-", "_&");
     assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new("-", 1, 1, 1))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid character '&'"), SourceFileLocation::new("-", 1, 2, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid character '&'."), SourceFileLocation::new("-", 1, 2, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
@@ -565,7 +581,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new("-", 1, 19, 4))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new("-", 1, 24, 1))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 25, 2))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Owned(format!("Decimal literal 4096 out of range (0...4095).")), SourceFileLocation::new("-", 1, 28, 4))));
+    assert_eq!(scanner.next(), Some(Token::Error(Cow::Owned(format!("Decimal literal 4096 not in range (0...4095).")), SourceFileLocation::new("-", 1, 28, 4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
