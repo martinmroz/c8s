@@ -1,8 +1,8 @@
 
-use std::borrow::Cow;
 use std::fmt;
 
 use assembler::source_file_location::SourceFileLocation;
+use assembler::scanner;
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Token<'a> {
@@ -23,7 +23,7 @@ pub enum Token<'a> {
   /// Newline, a \n character.
   Newline(SourceFileLocation<'a>),
   /// An including the reason that the tokenization failed.
-  Error(Cow<'a, str>, SourceFileLocation<'a>)
+  Error(scanner::Error<'a>, SourceFileLocation<'a>)
 }
 
 impl<'a> Token<'a> {
@@ -84,10 +84,11 @@ pub mod display_names {
 #[cfg(test)]
 mod tests {
   
-  use std::borrow::Cow;
+  use std::error;
   
   use super::*;
 
+  use assembler::scanner;
   use assembler::source_file_location::SourceFileLocation;
 
   #[test]
@@ -101,7 +102,10 @@ mod tests {
     assert_eq!(format!("{}", Token::NumericLiteral(12, location.clone())), "numeric literal (12 / $C)");
     assert_eq!(format!("{}", Token::Comma(location.clone())), "comma");
     assert_eq!(format!("{}", Token::Newline(location.clone())), "newline");
-    assert_eq!(format!("{}", Token::Error(Cow::Borrowed("error_reason"), location.clone())), "error_reason");
+
+    let error = scanner::Error::InvalidStringLiteral;
+    let expected_error_display = format!("{}.", (&error as &error::Error).description());
+    assert_eq!(format!("{}", Token::Error(error.clone(), location.clone())), expected_error_display);
   }
 
 }

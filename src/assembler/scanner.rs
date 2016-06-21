@@ -1,5 +1,4 @@
 
-use std::borrow::Cow;
 use std::error;
 use std::fmt;
 
@@ -9,7 +8,7 @@ use assembler::source_file_location::SourceFileLocation;
 use assembler::token::Token;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub enum FailureReason<'a> {
+pub enum Error<'a> {
   /// An invalid quoted string literal was encountered at `location`.
   InvalidStringLiteral,
   /// An invalid hexadecimal literal starting with `$` was encountered at `location`.
@@ -26,50 +25,31 @@ pub enum FailureReason<'a> {
   InvalidCharacter(char),
 }
 
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Error<'a> {
-  /// The `location` corresponding to the error in the source file.
-  location: SourceFileLocation<'a>, 
-  /// The issue occurring at the provided `location`.
-  failure_reason: FailureReason<'a>
-}
-
-impl<'a> Error<'a> {
-  /// Returns a new `Scanner::Error` instance for an error at `location` with `failure_reason`.
-  fn new(location: SourceFileLocation<'a>, failure_reason: FailureReason<'a>) -> Self {
-    Error {
-      location: location,
-      failure_reason: failure_reason
-    }
-  }
-}
-
 impl<'a> error::Error for Error<'a> {
   /// Returns a string slice with a general description of a scanner error.
   /// No specific information is contained. To obtain a printable representation,
   /// use the `fmt::Display` attribute.
   fn description(&self) -> &str {
-    match self.failure_reason {
-      FailureReason::InvalidStringLiteral        => "Invalid quoted string literal",
-      FailureReason::InvalidHexadecimalLiteral   => "Invalid hexadecimal literal starting with ($)",
-      FailureReason::DecimalLiteralOutOfRange(_) => "Decimal literal not in range 0...4095",
-      FailureReason::InvalidDecimalLiteral       => "Invalid decimal literal encountered",
-      FailureReason::InvalidIdentifier           => "Invalid identifier encountered",
-      FailureReason::ExpectedRegisterIndirect    => "Expected Index Register Indirect ([i]) not found",
-      FailureReason::InvalidCharacter(_)         => "Invalid character encountered",
+    match self {
+      &Error::InvalidStringLiteral        => "Invalid quoted string literal",
+      &Error::InvalidHexadecimalLiteral   => "Invalid hexadecimal literal starting with ($)",
+      &Error::DecimalLiteralOutOfRange(_) => "Decimal literal not in range 0...4095",
+      &Error::InvalidDecimalLiteral       => "Invalid decimal literal encountered",
+      &Error::InvalidIdentifier           => "Invalid identifier encountered",
+      &Error::ExpectedRegisterIndirect    => "Expected Index Register Indirect ([i]) not found",
+      &Error::InvalidCharacter(_)         => "Invalid character encountered",
     }
   }
 }
 
 impl<'a> fmt::Display for Error<'a> {
   /// Formats the receiver for display purposes. Incorporates specific information
-  /// relating to this particular error instance where applicable. Does not
-  /// incorporate line range information.
+  /// relating to this particular error instance where applicable.
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self.failure_reason {
-      FailureReason::DecimalLiteralOutOfRange(literal) =>
+    match self {
+      &Error::DecimalLiteralOutOfRange(literal) =>
         write!(f, "Decimal literal {} not in range (0...4095).", literal),
-      FailureReason::InvalidCharacter(character) =>
+      &Error::InvalidCharacter(character) =>
         write!(f, "Invalid character '{}'.", character),
       _ =>
         write!(f, "{}.", (self as &error::Error).description())
@@ -108,17 +88,17 @@ impl<'a> Scanner<'a> {
   /**
    Matches a single newline character.
    */
-  fn consume_newline(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_newline(&mut self) -> Token<'a> {
     let (value, location) = self.consume_char();
     assert!(value == '\n');
-    Ok(Token::Newline(location))
+    Token::Newline(location)
   }
   
   /**
    Matches a quoted string literal, including embedded backslash-escaped quote characters.
    @return A token containing the body of the string literal (still escaped), or Error.
    */
-  fn consume_string_literal(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_string_literal(&mut self) -> Token<'a> {
     lazy_static! {
        static ref STRING_LITERAL: Regex = Regex::new(r#"^"(?:[^"\\]|\\.)*""#).unwrap();
     }
@@ -129,13 +109,13 @@ impl<'a> Scanner<'a> {
         let slice_end = self.position + byte_index_end - '"'.len_utf8();
         let slice = &self.input[slice_start .. slice_end];
         let location = self.advance_by(byte_index_end);
-        Ok(Token::StringLiteral(slice, location))
+        Token::StringLiteral(slice, location)
       }
       _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
-        Err(Error::new(location, FailureReason::InvalidStringLiteral))
+        Token::Error(Error::InvalidStringLiteral, location)
       }
     }
   }
@@ -144,7 +124,7 @@ impl<'a> Scanner<'a> {
    Matches a 4, 8 or 12-bit hexadecimal literal beginning with $.
    @return A token containing the literal value as a usize, or Error in case of invalid formatting.
    */
-  fn consume_hex_literal(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_hex_literal(&mut self) -> Token<'a> {
     lazy_static! {
        static ref HEX_LITERAL: Regex = Regex::new(r#"^\$[0-9a-fA-F]{1,3}"#).unwrap();
     }
@@ -155,13 +135,13 @@ impl<'a> Scanner<'a> {
         let slice_end = self.position + byte_index_end;
         let slice = &self.input[slice_start .. slice_end];
         let location = self.advance_by(byte_index_end);
-        Ok(Token::NumericLiteral(usize::from_str_radix(slice, 16).ok().unwrap(), location))
+        Token::NumericLiteral(usize::from_str_radix(slice, 16).ok().unwrap(), location)
       }
       _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
-        Err(Error::new(location, FailureReason::InvalidHexadecimalLiteral))
+        Token::Error(Error::InvalidHexadecimalLiteral, location)
       }
     }
   }
@@ -170,7 +150,7 @@ impl<'a> Scanner<'a> {
    Matches a decimal literal from 0-4095.
    @return A token containing the literal value as a usize, or Error in case of invalid formatting.
    */
-  fn consume_decimal_literal(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_decimal_literal(&mut self) -> Token<'a> {
     lazy_static! {
        static ref DECIMAL_LITERAL: Regex = Regex::new(r#"^[0-9]{1,}"#).unwrap();
     }
@@ -185,13 +165,13 @@ impl<'a> Scanner<'a> {
         match usize::from_str_radix(slice, 10).ok() {
           Some(value) if value <= 4095 => {
             let location = self.advance_by(byte_index_end);
-            Ok(Token::NumericLiteral(value, location))
+            Token::NumericLiteral(value, location)
           }
           _ => {
             // Push to the end of the input to indicate parse failure.
             let location = self.advance_by(byte_index_end);
             self.position = self.input.len();
-            Err(Error::new(location, FailureReason::DecimalLiteralOutOfRange(slice)))
+            Token::Error(Error::DecimalLiteralOutOfRange(slice), location)
           }
         }
       }
@@ -199,7 +179,7 @@ impl<'a> Scanner<'a> {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
-        Err(Error::new(location, FailureReason::InvalidDecimalLiteral))
+        Token::Error(Error::InvalidDecimalLiteral, location)
       }
     }
   }
@@ -208,7 +188,7 @@ impl<'a> Scanner<'a> {
    Matches an identifier beginning with _ or a letter, then a run of _, numbers or letters.
    @return A token containing the name of the identifier, or Error in case of invalid formatting.
    */
-  fn consume_identifier(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_identifier(&mut self) -> Token<'a> {
     lazy_static! {
        static ref IDENTIFIER: Regex = Regex::new(r#"^[_a-zA-Z][_a-zA-Z0-9]{0,}"#).unwrap();
     }
@@ -217,13 +197,13 @@ impl<'a> Scanner<'a> {
         // Strip off the leading '$' and parse the hexadecimal value.
         let slice = &self.input[self.position .. self.position + byte_index_end];
         let location = self.advance_by(byte_index_end);
-        Ok(Token::Identifier(slice, location))
+        Token::Identifier(slice, location)
       }
       _ => {
         // Advance to the end of the input to terminate the parse and indicate failure.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
-        Err(Error::new(location, FailureReason::InvalidIdentifier))
+        Token::Error(Error::InvalidIdentifier, location)
       }
     }
   }
@@ -232,7 +212,7 @@ impl<'a> Scanner<'a> {
    Consumes an Index Register Indirect identifier, [i].
    @return A token containing the identifier, or Error in case of invalid formatting.
    */
-  fn consume_index_register_indirect(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_index_register_indirect(&mut self) -> Token<'a> {
     let index_register_indirect = "[i]";
 
     // The Index Register Indirect identifier, [i] is consumed as an identifier.
@@ -240,12 +220,12 @@ impl<'a> Scanner<'a> {
       let length = index_register_indirect.len();
       let slice = &self.input[self.position .. self.position + length];
       let location = self.advance_by(length);
-      return Ok(Token::Identifier(slice, location));
+      return Token::Identifier(slice, location);
     }
     
     let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
     self.position = self.input.len();
-    Err(Error::new(location, FailureReason::ExpectedRegisterIndirect))
+    Token::Error(Error::ExpectedRegisterIndirect, location)
   }
   
   /**
@@ -253,7 +233,7 @@ impl<'a> Scanner<'a> {
    This method will panic if the first character to be processed is not a ';'.
    @return A token containing the entirety of the comment, including the ';' but not the newline.
    */
-  fn consume_single_line_comment(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_single_line_comment(&mut self) -> Token<'a> {
     assert!(self.char_at(0) == ';');
     
     // Determine how many bytes to consume, including the ';' but not the \n.
@@ -268,34 +248,34 @@ impl<'a> Scanner<'a> {
     
     let slice = &self.input[self.position .. self.position + bytes];
     let location = self.advance_by(bytes);
-    Ok(Token::SingleLineComment(slice, location))
+    Token::SingleLineComment(slice, location)
   }
   
   /**
    @return A token representing a directive marker.
    */
-  fn consume_directive_marker(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_directive_marker(&mut self) -> Token<'a> {
     let (value, location) = self.consume_char();
     assert!(value == '.');
-    Ok(Token::DirectiveMarker(location))
+    Token::DirectiveMarker(location)
   }
   
   /**
    @return A token representing a label marker.
    */
-  fn consume_label_marker(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_label_marker(&mut self) -> Token<'a> {
     let (value, location) = self.consume_char();
     assert!(value == ':');
-    Ok(Token::LabelMarker(location))
+    Token::LabelMarker(location)
   }
   
   /**
    @return A token representing a comma.
    */
-  fn consume_comma(&mut self) -> Result<Token<'a>, Error<'a>> {
+  fn consume_comma(&mut self) -> Token<'a> {
     let (value, location) = self.consume_char();
     assert!(value == ',');
-    Ok(Token::Comma(location))
+    Token::Comma(location)
   }
   
   /**
@@ -361,7 +341,7 @@ impl<'a> Scanner<'a> {
   /**
    @return The next token, or None if the scanner has reached the end of the input.
    */
-  pub fn next_result(&mut self) -> Option<Result<Token<'a>, Error<'a>>> {
+  pub fn next_token(&mut self) -> Option<Token<'a>> {
     self.consume_whitespace();
     if self.is_at_end() {
       return None;
@@ -392,7 +372,7 @@ impl<'a> Scanner<'a> {
         // Advance to end of input on invalid token.
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
-        Some(Err(Error::new(location, FailureReason::InvalidCharacter(c))))
+        Some(Token::Error(Error::InvalidCharacter(c), location))
       }
     }
   }
@@ -415,23 +395,13 @@ impl<'a> Scanner<'a> {
 impl<'a> Iterator for Scanner<'a> {
   type Item = Token<'a>;
   fn next(&mut self) -> Option<Self::Item> {
-    self.next_result().map(|result|
-      match result {
-        Ok(token) => token,
-        Err(error) => {
-          // Convert the Error into a deprecated Token::Error.
-          Token::Error(Cow::Owned(format!("{}", error)), error.location)
-        }
-      }
-    )
+    self.next_token()
   }
 }
 
 #[cfg(test)]
 mod tests {
   
-  use std::borrow::Cow;
-
   use assembler::token::Token;
   use assembler::source_file_location::SourceFileLocation;
 
@@ -538,7 +508,7 @@ mod tests {
     
     scanner = Scanner::new("-", "_&");
     assert_eq!(scanner.next(), Some(Token::Identifier("_", SourceFileLocation::new("-", 1, 1, 1))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid character '&'."), SourceFileLocation::new("-", 1, 2, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::InvalidCharacter('&'), SourceFileLocation::new("-", 1, 2, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
     
@@ -553,7 +523,7 @@ mod tests {
   fn test_index_register_indirect() {
     let mut scanner = Scanner::new("-", "[i] [a]");
     assert_eq!(scanner.next(), Some(Token::Identifier("[i]", SourceFileLocation::new("-", 1, 1, 3))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Expected Index Register Indirect ([i]) not found."), SourceFileLocation::new("-", 1, 5, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::ExpectedRegisterIndirect, SourceFileLocation::new("-", 1, 5, 1))));
   }
   
   #[test]
@@ -568,7 +538,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new("-", 1, 23, 4))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 28, 2))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 30, 2))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid hexadecimal literal starting with ($)."), SourceFileLocation::new("-", 1, 33, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::InvalidHexadecimalLiteral, SourceFileLocation::new("-", 1, 33, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
@@ -585,7 +555,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(4095, SourceFileLocation::new("-", 1, 19, 4))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new("-", 1, 24, 1))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 25, 2))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Owned(format!("Decimal literal 4096 not in range (0...4095).")), SourceFileLocation::new("-", 1, 28, 4))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::DecimalLiteralOutOfRange("4096"), SourceFileLocation::new("-", 1, 28, 4))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
@@ -597,7 +567,7 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::StringLiteral("a", SourceFileLocation::new("-", 1, 4, 3))));
     assert_eq!(scanner.next(), Some(Token::StringLiteral("😊😞", SourceFileLocation::new("-", 1, 8, 4))));
     assert_eq!(scanner.next(), Some(Token::StringLiteral("123", SourceFileLocation::new("-", 1, 13, 5))));
-    assert_eq!(scanner.next(), Some(Token::Error(Cow::Borrowed("Invalid quoted string literal."), SourceFileLocation::new("-", 1, 19, 1))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::InvalidStringLiteral, SourceFileLocation::new("-", 1, 19, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
