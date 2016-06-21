@@ -45,8 +45,9 @@ impl<'a> Error<'a> {
 }
 
 impl<'a> error::Error for Error<'a> {
-  /// Returns a string slice to a general description of the scanner error.
-  /// No specific information is contained.
+  /// Returns a string slice with a general description of a scanner error.
+  /// No specific information is contained. To obtain a printable representation,
+  /// use the `fmt::Display` attribute.
   fn description(&self) -> &str {
     match self.failure_reason {
       FailureReason::InvalidStringLiteral        => "Invalid quoted string literal",
@@ -61,19 +62,17 @@ impl<'a> error::Error for Error<'a> {
 }
 
 impl<'a> fmt::Display for Error<'a> {
+  /// Formats the receiver for display purposes. Incorporates specific information
+  /// relating to this particular error instance where applicable. Does not
+  /// incorporate line range information.
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self.failure_reason {
-      FailureReason::DecimalLiteralOutOfRange(literal)  => {
-        write!(f, "Decimal literal {} not in range (0...4095).", literal)
-      }
-
-      FailureReason::InvalidCharacter(character) => {
-        write!(f, "Invalid character '{}'.", character)
-      }
-
-      _ => {
+      FailureReason::DecimalLiteralOutOfRange(literal) =>
+        write!(f, "Decimal literal {} not in range (0...4095).", literal),
+      FailureReason::InvalidCharacter(character) =>
+        write!(f, "Invalid character '{}'.", character),
+      _ =>
         write!(f, "{}.", (self as &error::Error).description())
-      }
     }
   }
 }

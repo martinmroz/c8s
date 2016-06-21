@@ -1,8 +1,6 @@
 
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate twelve_bit;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate twelve_bit;
 
 extern crate getopts;
 extern crate ihex;
