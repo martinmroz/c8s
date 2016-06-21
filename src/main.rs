@@ -19,7 +19,7 @@ use getopts::Options;
 pub mod assembler;
 use assembler::assembler::*;
 use assembler::data_range;
-use assembler::i8hex_writer;
+use assembler::ihex_writer;
 use assembler::parser::*;
 use assembler::scanner::Scanner;
 
@@ -74,7 +74,7 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
   }
 
   // Convert the data ranges to Intel I8HEX format.
-  let result = i8hex_writer::i8hex_representation_of_data_ranges(&data_ranges);
+  let result = ihex_writer::ihex_representation_of_data_ranges(&data_ranges);
 
   // Open the output file for writing (truncate) or use stdout if the specified path is `-`.
   let mut output_file: Box<io::Write> = match output_path {

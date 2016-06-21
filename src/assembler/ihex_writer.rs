@@ -11,12 +11,12 @@ use assembler::data_range::DataRange;
 
 /**
  Converts the provided data ranges into a single Intel HEX record. These data ranges
- cannot overlap and still yield a valid I8HEX record. It is the responsibility of
+ cannot overlap and still yield a valid ihex record. It is the responsibility of
  the caller to ensure this does not happen.
- @param ranges The data ranges to convert to I8HEX format.
- @return The complete I8HEX record (including EOF) of the given data ranges.
+ @param ranges The data ranges to convert to ihex format.
+ @return The complete ihex record (including EOF) of the given data ranges.
  */
-pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [DataRange]) -> String {
+pub fn ihex_representation_of_data_ranges<'a>(ranges: &'a [DataRange]) -> String {
   assert!(data_range::find_overlapping_ranges(ranges).len() == 0);
 
   // All records are collected into a list.
@@ -52,7 +52,7 @@ pub fn i8hex_representation_of_data_ranges<'a>(ranges: &'a [DataRange]) -> Strin
 
   }
 
-  // All I8HEX files end in an EOF marker.
+  // All ihex files end in an EOF marker.
   records.push(Record::EndOfFile);
 
   // Obtain the formatted representation of each record and join with newlines for display.
@@ -68,17 +68,17 @@ mod tests {
 
   use assembler::data_range::DataRange;
 
-  use super::i8hex_representation_of_data_ranges;
+  use super::ihex_representation_of_data_ranges;
 
   #[test]
-  fn test_i8hex_representation_of_data_ranges_no_ranges() {
+  fn test_ihex_representation_of_data_ranges_no_ranges() {
     // An empty set of data ranges yields just an EOF marker.
-    assert_eq!(i8hex_representation_of_data_ranges(&[]), String::from(":00000001FF\n"));
+    assert_eq!(ihex_representation_of_data_ranges(&[]), String::from(":00000001FF\n"));
   }
 
   #[test]
-  fn test_i8hex_representation_of_data_ranges_one_range() {
-    // Build an average-case I8HEX record.
+  fn test_ihex_representation_of_data_ranges_one_range() {
+    // Build an average-case ihex record.
     let mut data_range = DataRange::new(u12![0x100]);
     data_range.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
     data_range.append(&vec![0x21,0x46,0x01,0x7E,0x17,0xC2,0x00,0x01,0xFF,0x5F,0x16,0x00,0x21,0x48,0x01,0x19]);
@@ -86,18 +86,18 @@ mod tests {
     data_range.append(&vec![0x3F,0x01,0x56,0x70,0x2B,0x5E,0x71,0x2B,0x72,0x2B,0x73,0x21,0x46,0x01,0x34,0x21]);
 
     // Validate the average case yielded the anticipated result.
-    let i8hex_rep_average = i8hex_representation_of_data_ranges(&[data_range]);
-    let expected_i8hex_rep_average = String::new() +
+    let ihex_rep_average = ihex_representation_of_data_ranges(&[data_range]);
+    let expected_ihex_rep_average = String::new() +
       &":10010000214601360121470136007EFE09D2190140\n" + 
       &":100110002146017E17C20001FF5F16002148011928\n" +
       &":10012000194E79234623965778239EDA3F01B2CAA7\n" +
       &":100130003F0156702B5E712B722B732146013421C7\n" +
       &":00000001FF\n";
-    assert_eq!(i8hex_rep_average, expected_i8hex_rep_average);
+    assert_eq!(ihex_rep_average, expected_ihex_rep_average);
   }
 
   #[test]
-  fn test_i8hex_representation_of_data_ranges_adjacent_ranges() {
+  fn test_ihex_representation_of_data_ranges_adjacent_ranges() {
     // Build a pair of adjacent data ranges.
     let mut range_a = DataRange::new(u12![0x100]);
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
@@ -105,16 +105,16 @@ mod tests {
     range_b.append(&vec![0x21,0x46,0x01,0x7E,0x17,0xC2,0x00,0x01,0xFF,0x5F,0x16,0x00,0x21,0x48,0x01,0x19]);
 
     // Validate the average case yielded the anticipated result.
-    let i8hex_rep_adjacent = i8hex_representation_of_data_ranges(&[range_a, range_b]);
-    let expected_i8hex_rep_adjacent = String::new() +
+    let ihex_rep_adjacent = ihex_representation_of_data_ranges(&[range_a, range_b]);
+    let expected_ihex_rep_adjacent = String::new() +
       &":10010000214601360121470136007EFE09D2190140\n" + 
       &":100110002146017E17C20001FF5F16002148011928\n" +
       &":00000001FF\n";
-    assert_eq!(i8hex_rep_adjacent, expected_i8hex_rep_adjacent);
+    assert_eq!(ihex_rep_adjacent, expected_ihex_rep_adjacent);
   }
 
   #[test]
-  fn test_i8hex_representation_of_data_ranges_disjoint_ranges() {
+  fn test_ihex_representation_of_data_ranges_disjoint_ranges() {
     // Build an disjoint pair of data ranges.
     let mut range_a = DataRange::new(u12![0x100]);
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
@@ -122,16 +122,16 @@ mod tests {
     range_b.append(&vec![0x3F,0x01,0x56,0x70,0x2B,0x5E,0x71,0x2B,0x72,0x2B,0x73,0x21,0x46,0x01,0x34,0x21]);
 
     // Validate the average case yielded the anticipated result.
-    let i8hex_rep_disjoint = i8hex_representation_of_data_ranges(&[range_a, range_b]);
-    let expected_i8hex_rep_disjoint = String::new() +
+    let ihex_rep_disjoint = ihex_representation_of_data_ranges(&[range_a, range_b]);
+    let expected_ihex_rep_disjoint = String::new() +
       &":10010000214601360121470136007EFE09D2190140\n" + 
       &":100130003F0156702B5E712B722B732146013421C7\n" +
       &":00000001FF\n";
-    assert_eq!(i8hex_rep_disjoint, expected_i8hex_rep_disjoint);
+    assert_eq!(ihex_rep_disjoint, expected_ihex_rep_disjoint);
   }
 
   #[test]
-  fn test_i8hex_representation_of_data_ranges_uneven_ranges() {
+  fn test_ihex_representation_of_data_ranges_uneven_ranges() {
     // Build an uneven set of data ranges.
     let mut range_a = DataRange::new(u12![0x100]);
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19]);
@@ -141,25 +141,25 @@ mod tests {
     range_c.append(&vec![0x3F]);
 
     // Validate the average case yielded the anticipated result.
-    let i8hex_rep = i8hex_representation_of_data_ranges(&[range_a, range_b, range_c]);
-    let expected_i8hex_rep = String::new() +
+    let ihex_rep = ihex_representation_of_data_ranges(&[range_a, range_b, range_c]);
+    let expected_ihex_rep = String::new() +
       &":0F010000214601360121470136007EFE09D21942\n" + 
       &":100130003F0156702B5E712B722B732146013421C7\n" +
       &":01014000229C\n" +
       &":010200003FBE\n" +
       &":00000001FF\n";
-    assert_eq!(i8hex_rep, expected_i8hex_rep);
+    assert_eq!(ihex_rep, expected_ihex_rep);
   }
 
   #[test]
   #[should_panic]
-  fn test_i8hex_representation_of_data_ranges_panics_when_overlapping() {
+  fn test_ihex_representation_of_data_ranges_panics_when_overlapping() {
     // Build an overlapping pair of ranges.
     let mut range_a = DataRange::new(u12![0x100]);
     range_a.append(&vec![0x21,0x46,0x01,0x36,0x01,0x21,0x47,0x01,0x36,0x00,0x7E,0xFE,0x09,0xD2,0x19,0x01]);
     let mut range_b = DataRange::new(u12![0x101]);
     range_b.append(&vec![0x3F,0x01,0x56,0x70,0x2B,0x5E,0x71,0x2B,0x72,0x2B,0x73,0x21,0x46,0x01,0x34,0x21]);
-    i8hex_representation_of_data_ranges(&[range_a, range_b]);
+    ihex_representation_of_data_ranges(&[range_a, range_b]);
   }
 
 }
