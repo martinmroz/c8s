@@ -44,17 +44,17 @@ impl<'a> fmt::Display for Error<'a> {
         match expected.len() {
           0 => panic!("Unexpected end-of-file with no expectations."),
           1 => write!(f, "error: Unexpected end-of-file reached, expecting {}.", expected[0]),
-          _ => write!(f, "error: Unexpected end-of-file reached, expecting one of: {}.", expected.join(",")),
+          _ => write!(f, "error: Unexpected end-of-file reached, expecting one of: {}.", expected.join(", ")),
         }
       }
 
       &Error::UnexpectedToken { ref expected, encountered: Token::Error(ref reason, ref location) } => {
-        write!(f, "{}: error: Encountered syntax error: {}.", location, reason)
+        write!(f, "{}: error: Encountered syntax error: {}\n", location, reason)
           .and_then(|()| {
             match expected.len() {
               0 => panic!("Unexpected token (found error) with no expectations."),
-              1 => write!(f, "{}: error: expecting {}.", location, expected[0]),
-              _ => write!(f, "{}: error: expecting one of: {}.", location, expected.join(","))
+              1 => write!(f, "{}: error: Expecting {}.", location, expected[0]),
+              _ => write!(f, "{}: error: Expecting one of: {}.", location, expected.join(", "))
             }
           })
       }
@@ -64,7 +64,7 @@ impl<'a> fmt::Display for Error<'a> {
         match expected.len() {
           0 => panic!("Unexpected end-of-file with no expectations."),
           1 => write!(f, "{}: error: Unexpected token found: {}, expecting {}.", loc, found, expected[0]),
-          _ => write!(f, "{}: error: Unexpected token found: {}, expecting one of: {}.", loc, found, expected.join(",")),
+          _ => write!(f, "{}: error: Unexpected token found: {}, expecting one of: {}.", loc, found, expected.join(", ")),
         }
       }
     }
@@ -511,6 +511,7 @@ mod tests {
   use twelve_bit::u12::*;
   
   use assembler::source_file_location::SourceFileLocation;
+  use assembler::scanner;
   use assembler::scanner::Scanner;
   use assembler::token::Token;
   use assembler::token::display_names;
@@ -519,6 +520,80 @@ mod tests {
   use super::Parser;
   use super::{DirectiveData, InstructionData, LabelData};
   use super::{Literal, Node, InstructionField};
+
+  #[test]
+  fn test_error_display_unexpected_eof() {
+    let one_item = format!("{}", Error::UnexpectedEndOfFile(vec![display_names::COMMA]));
+    assert_eq!(one_item, "error: Unexpected end-of-file reached, expecting comma.");
+    let two_items = format!("{}", Error::UnexpectedEndOfFile(vec![display_names::COMMA, display_names::STRING_LITERAL]));
+    assert_eq!(two_items, "error: Unexpected end-of-file reached, expecting one of: comma, string literal.");
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_error_display_unexpected_eof_panics_on_zero_expectations() {
+    let _ = format!("{}", Error::UnexpectedEndOfFile(vec![]));
+  }
+
+  #[test]
+  fn test_error_display_unexpected_token_error() {
+    let error_token = Token::Error(scanner::Error::InvalidStringLiteral, SourceFileLocation::new("-", 1, 1, 1));
+    let one_item = format!("{}", Error::UnexpectedToken { 
+      expected: vec![display_names::COMMA], 
+      encountered: error_token.clone()
+    });
+    let one_item_expected = String::new()
+      + &"-:1:1: error: Encountered syntax error: Invalid quoted string literal.\n"
+      + &"-:1:1: error: Expecting comma.";
+    assert_eq!(one_item, one_item_expected);
+
+    let two_items = format!("{}", Error::UnexpectedToken { 
+      expected: vec![display_names::COMMA, display_names::STRING_LITERAL],
+      encountered: error_token.clone()
+    });
+    let two_items_expected = String::new()
+      + &"-:1:1: error: Encountered syntax error: Invalid quoted string literal.\n"
+      + &"-:1:1: error: Expecting one of: comma, string literal.";
+    assert_eq!(two_items, two_items_expected);
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_error_display_unexpected_token_error_panics_on_zero_expectations() {
+    let error_token = Token::Error(scanner::Error::InvalidStringLiteral, SourceFileLocation::new("-", 1, 1, 1));
+    let _ = format!("{}", Error::UnexpectedToken {
+      expected: vec![],
+      encountered: error_token
+    });
+  }
+
+  #[test]
+  fn test_error_display_unexpected_token() {
+    let comma_token = Token::Comma(SourceFileLocation::new("-", 1, 1, 1));
+    let one_item = format!("{}", Error::UnexpectedToken { 
+      expected: vec![display_names::NEWLINE], 
+      encountered: comma_token.clone()
+    });
+    let one_item_expected = "-:1:1: error: Unexpected token found: comma, expecting newline.";
+    assert_eq!(one_item, one_item_expected);
+
+    let two_items = format!("{}", Error::UnexpectedToken { 
+      expected: vec![display_names::NEWLINE, display_names::STRING_LITERAL],
+      encountered: comma_token.clone()
+    });
+    let two_items_expected = "-:1:1: error: Unexpected token found: comma, expecting one of: newline, string literal.";
+    assert_eq!(two_items, two_items_expected);
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_error_display_unexpected_token_panics_on_zero_expectations() {
+    let error_token = Token::Comma(SourceFileLocation::new("-", 1, 1, 1));
+    let _ = format!("{}", Error::UnexpectedToken {
+      expected: vec![],
+      encountered: error_token
+    });
+  }
 
   #[test]
   fn test_parse_literal_list() {
