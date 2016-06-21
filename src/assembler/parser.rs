@@ -1,4 +1,5 @@
 
+use std::error;
 use std::fmt;
 use std::mem;
 
@@ -7,6 +8,68 @@ use twelve_bit::u12::*;
 use assembler::source_file_location::SourceFileLocation;
 use assembler::token::Token;
 use assembler::token::display_names;
+
+// MARK: - Parser Error
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Error<'a> {
+  /// An unexpected end-of-file was encountered. Field is the list of expected token names.
+  UnexpectedEndOfFile(Vec<&'static str>),
+  /// An token was `encountered` which is not in the list of `expected` token names.
+  UnexpectedToken { expected: Vec<&'static str>, encountered: Token<'a> },
+}
+
+impl<'a> error::Error for Error<'a> {
+  /// Returns a string slice with a general description of a parser error.
+  /// No specific information is contained. To obtain a printable representation,
+  /// use the `fmt::Display` attribute.
+  fn description(&self) -> &str {
+    match self {
+      &Error::UnexpectedEndOfFile(_)                    => "Unexpected end-of-file reached",
+      &Error::UnexpectedToken{expected:_,encountered:_} => "Unexpected token found",
+    }
+  }
+}
+
+impl<'a> fmt::Display for Error<'a> {
+  /// Formats the receiver for display purposes. Incorporates specific information
+  /// relating to this particular error instance where applicable, including source range
+  /// information and severity level annotations.
+  ///
+  /// # Panics
+  /// Will panic if the number of expected tokens names for an error is ever zero.
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &Error::UnexpectedEndOfFile(ref expected) => {
+        match expected.len() {
+          0 => panic!("Unexpected end-of-file with no expectations."),
+          1 => write!(f, "error: Unexpected end-of-file reached, expecting {}.", expected[0]),
+          _ => write!(f, "error: Unexpected end-of-file reached, expecting one of: {}.", expected.join(",")),
+        }
+      }
+
+      &Error::UnexpectedToken { ref expected, encountered: Token::Error(ref reason, ref location) } => {
+        write!(f, "{}: error: Encountered syntax error: {}.", location, reason)
+          .and_then(|()| {
+            match expected.len() {
+              0 => panic!("Unexpected token (found error) with no expectations."),
+              1 => write!(f, "{}: error: expecting {}.", location, expected[0]),
+              _ => write!(f, "{}: error: expecting one of: {}.", location, expected.join(","))
+            }
+          })
+      }
+
+      &Error::UnexpectedToken { ref expected, encountered: ref found } => {
+        let loc = found.location();
+        match expected.len() {
+          0 => panic!("Unexpected end-of-file with no expectations."),
+          1 => write!(f, "{}: error: Unexpected token found: {}, expecting {}.", loc, found, expected[0]),
+          _ => write!(f, "{}: error: Unexpected token found: {}, expecting one of: {}.", loc, found, expected.join(",")),
+        }
+      }
+    }
+  }
+}
 
 // MARK: - Abstract Syntax List
 
@@ -28,7 +91,7 @@ pub enum Literal<'a> {
   Numeric(usize)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct DirectiveData<'a> {
   /// The location at which the directive is defined for error reporting purposes.
   pub location: SourceFileLocation<'a>,
@@ -38,7 +101,7 @@ pub struct DirectiveData<'a> {
   pub arguments: Vec<Literal<'a>> 
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct LabelData<'a> {
   /// The location at which the label is defined for error reporting purposes.
   pub location: SourceFileLocation<'a>,
@@ -46,7 +109,7 @@ pub struct LabelData<'a> {
   pub identifier: &'a str
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum InstructionField<'a> {
   /// A numeric literal value.
   NumericLiteral(U12),
@@ -66,7 +129,7 @@ pub enum InstructionField<'a> {
   Identifier(&'a str)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct InstructionData<'a> {
   /// The location at which the directive is defined for error reporting purposes.
   pub location: SourceFileLocation<'a>,
@@ -120,8 +183,8 @@ macro_rules! expect_and_consume {
       $pattern => {
         $parser.consume_token().unwrap()
       }
-      _ => { 
-        return Err($parser.syntax_error_for_unexpected_token($name));
+      _ => {
+        return Err($parser.syntax_error_for_unexpected_token(vec![$name]));
       }
     }
   }}
@@ -170,11 +233,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      a certain token, and either a different one was found or the end of the
      token stream was reached prematurely.
    */
-  fn syntax_error_for_unexpected_token(&self, expecting: &str) -> String {
+  fn syntax_error_for_unexpected_token(&self, expected: Vec<&'static str>) -> Error<'a> {
     if let Some(ref token) = self.current_token {
-      format!("{}: error: Unexpected token found: {}, expecting {}.", token.location(), token, expecting)
+      Error::UnexpectedToken { expected: expected, encountered: token.clone() }
     } else {
-      format!("error: Unexpected end-of-file reached, expecting {}.", expecting)
+      Error::UnexpectedEndOfFile(expected)
     }
   }
 
@@ -185,7 +248,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    identifier ::= IDENTIFIER.
    @return The string value of the identifier if successful, or an error.
    */
-  fn parse_identifier(&mut self) -> Result<(&'a str, SourceFileLocation<'a>), String> {
+  fn parse_identifier(&mut self) -> Result<(&'a str, SourceFileLocation<'a>), Error<'a>> {
     if let Token::Identifier(id,loc) = expect_and_consume!(self, Some(Token::Identifier(_,_)), display_names::IDENTIFIER) {
       Ok((id, loc))
     } else {
@@ -198,7 +261,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    literal ::= STRING | NUMERIC.
    @return The literal if successful, or an error.
    */
-  fn parse_literal(&mut self) -> Result<Literal<'a>, String> {
+  fn parse_literal(&mut self) -> Result<Literal<'a>, Error<'a>> {
     match self.current_token {
 
       // Match and consume a string literal token.
@@ -214,8 +277,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       }
 
       _ => {
-        let expected = format!("{} or {}", display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL);
-        Err(self.syntax_error_for_unexpected_token(expected.as_str()))
+        let expected = vec![display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL];
+        Err(self.syntax_error_for_unexpected_token(expected))
       }
     }
   }
@@ -226,7 +289,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @param list Provide an empty Vec<Literal>.
    @return A list of literals if successful, or an error.
    */
-  fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, String> {
+  fn parse_literal_list(&mut self, list: Vec<Literal<'a>>) -> Result<Vec<Literal<'a>>, Error<'a>> {
     
     // The literal list is complete.
     if let Some(Token::Newline(_)) = self.current_token {
@@ -253,7 +316,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    directive ::= "." IDENTIFIER literal_list
    @return A directive node if successful, or an error.
    */
-  fn parse_directive(&mut self) -> Result<Node<'a>, String> {
+  fn parse_directive(&mut self) -> Result<Node<'a>, Error<'a>> {
     expect_and_consume!(self, Some(Token::DirectiveMarker(_)), display_names::DIRECTIVE_MARKER);
 
     let ( id,loc ) = try!(self.parse_identifier());
@@ -268,7 +331,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    label ::= IDENTIFIER ":"
    @return A Label node if successful, or an error.
    */
-  fn parse_label(&mut self) -> Result<Node<'a>, String> {
+  fn parse_label(&mut self) -> Result<Node<'a>, Error<'a>> {
     let (id, loc) = try!(self.parse_identifier());
 
     expect_and_consume!(self, Some(Token::LabelMarker(_)), display_names::LABEL_MARKER);
@@ -285,7 +348,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @param list Provide an empty Vec<InstructionField<'a>>.
    @return A list of fields if successful, or an error.
    */
-  fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, String> {
+  fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, Error<'a>> {
 
     // The field list is complete.
     if let Some(Token::Newline(_)) = self.current_token {
@@ -314,7 +377,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
           // Now it's a GPR or an Identifier.
           identifier_string @ _ => {
-            let mut field = InstructionField::Identifier(identifier_string);
+            let mut field  = InstructionField::Identifier(identifier_string);
 
             // If the identifier matches ("v"[0-9a-fA-F]), it's a GPR.
             let id_length = identifier_string.chars().count();
@@ -336,7 +399,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // No field discovered.
       _ => {
-        return Err(self.syntax_error_for_unexpected_token("instruction field"))
+        return Err(self.syntax_error_for_unexpected_token(vec![display_names::INSTRUCTION_FIELD]))
       }
 
     };
@@ -360,7 +423,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    instruction ::= IDENTIFIER field_list
    @return An Instruction node if successful, or an error.
    */
-  fn parse_instruction(&mut self) -> Result<Node<'a>, String> {
+  fn parse_instruction(&mut self) -> Result<Node<'a>, Error<'a>> {
     let (mnemonic,loc) = try!(self.parse_identifier());
     let list_of_fields = try!(self.parse_field_list(Vec::new()));
 
@@ -373,7 +436,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    statement ::= directive | label | instruction
    @return An appropriate Node if successful, or an error.
    */
-  fn parse_statement(&mut self) -> Result<Node<'a>, String> {
+  fn parse_statement(&mut self) -> Result<Node<'a>, Error<'a>> {
 
     // A directive is identified by a directive marker.
     if let Some(Token::DirectiveMarker(_)) = self.current_token {
@@ -394,8 +457,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     }
 
     // Generate syntax error based on token display names.
-    let expecting = format!("{} or {}", display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER);
-    Err(self.syntax_error_for_unexpected_token(expecting.as_str()))
+    let expecting = vec![display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER];
+    Err(self.syntax_error_for_unexpected_token(expecting))
   }
 
   /**
@@ -403,7 +466,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    statement_list ::= (statement | COMMENT | NEWLINE) statement_list | .
    @return A list of consumed nodes if successful, or an error.
    */
-  fn parse_statement_list(&mut self) -> Result<Vec<Node<'a>>, String> {
+  fn parse_statement_list(&mut self) -> Result<Vec<Node<'a>>, Error<'a>> {
     let mut node_list = Vec::new();
 
     while let Some(_) = self.current_token {
@@ -436,7 +499,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
  @param scanner The input token stream.
  @return A list of Nodes for further processing, or an error.
  */
-pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, String> where I: Iterator<Item=Token<'a>> {
+pub fn parse<'a, I>(scanner: I) -> Result<Vec<Node<'a>>, Error<'a>> where I: Iterator<Item=Token<'a>> {
   Parser::new(scanner).parse_statement_list()
 }
 
@@ -449,7 +512,10 @@ mod tests {
   
   use assembler::source_file_location::SourceFileLocation;
   use assembler::scanner::Scanner;
+  use assembler::token::Token;
+  use assembler::token::display_names;
 
+  use super::Error;
   use super::Parser;
   use super::{DirectiveData, InstructionData, LabelData};
   use super::{Literal, Node, InstructionField};
@@ -458,13 +524,24 @@ mod tests {
   fn test_parse_literal_list() {
     // A literal list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
-    assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err("error: Unexpected end-of-file reached, expecting numeric literal or string literal.".to_string()));
+    assert_eq!(parser.parse_literal_list(Vec::new()),
+      Err(
+        Error::UnexpectedEndOfFile(
+          vec![display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL]
+        )
+      )
+    );
 
     // A literal list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
-    assert_eq!(parser.parse_literal_list(Vec::new()), 
-      Err(format!("-:1:1: error: Unexpected token found: comma, expecting numeric literal or string literal.")));
+    assert_eq!(parser.parse_literal_list(Vec::new()),
+      Err(
+        Error::UnexpectedToken {
+          encountered: Token::Comma(SourceFileLocation::new("-", 1, 1, 1)),
+          expected: vec![display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL]
+        }
+      )
+    );
 
     // An empty literal list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));
@@ -537,17 +614,34 @@ mod tests {
     // A field list expects to be terminated by a newline.
     let mut parser = Parser::new(Scanner::new("-", ""));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err("error: Unexpected end-of-file reached, expecting instruction field.".to_string()));
+      Err(
+        Error::UnexpectedEndOfFile(
+          vec![display_names::INSTRUCTION_FIELD]
+        )
+      )
+    );
 
     // A field list cannot contain a comma alone.
     parser = Parser::new(Scanner::new("-", ",\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1: error: Unexpected token found: comma, expecting instruction field.")));
+      Err(
+        Error::UnexpectedToken {
+          encountered: Token::Comma(SourceFileLocation::new("-", 1, 1, 1)),
+          expected: vec![display_names::INSTRUCTION_FIELD]
+        }
+      )
+    );
 
     // A field list cannot contain a string literal.
     parser = Parser::new(Scanner::new("-", "\"Hello\"\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), 
-      Err(format!("-:1:1-7: error: Unexpected token found: string literal (\"Hello\"), expecting instruction field.")));
+      Err(
+        Error::UnexpectedToken {
+          encountered: Token::StringLiteral("Hello", SourceFileLocation::new("-", 1, 1, 7)),
+          expected: vec![display_names::INSTRUCTION_FIELD]
+        }
+      )
+    );
 
     // An empty field list is valid.
     parser = Parser::new(Scanner::new("-", "\n"));

@@ -79,6 +79,7 @@ pub mod display_names {
   pub const NUMERIC_LITERAL: &'static str     = "numeric literal";
   pub const COMMA: &'static str               = "comma";
   pub const NEWLINE: &'static str             = "newline";
+  pub const INSTRUCTION_FIELD: &'static str   = "instruction field";
 }
 
 #[cfg(test)]
