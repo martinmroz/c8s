@@ -62,7 +62,7 @@ impl<'a> fmt::Display for Error<'a> {
       &Error::UnexpectedToken { ref expected, encountered: ref found } => {
         let loc = found.location();
         match expected.len() {
-          0 => panic!("Unexpected end-of-file with no expectations."),
+          0 => panic!("Unexpected token with no expectations."),
           1 => write!(f, "{}: error: Unexpected token found: {}, expecting {}.", loc, found, expected[0]),
           _ => write!(f, "{}: error: Unexpected token found: {}, expecting one of: {}.", loc, found, expected.join(", ")),
         }
