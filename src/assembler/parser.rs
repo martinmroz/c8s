@@ -393,7 +393,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // No field discovered.
       _ => {
-        return Err(Self::syntax_error_for_unexpected_token(&self.current_token, vec![display_names::INSTRUCTION_FIELD]));
+        let expecting = vec![display_names::INSTRUCTION_FIELD];
+        return Err(Self::syntax_error_for_unexpected_token(&self.current_token, expecting));
       }
 
     };
