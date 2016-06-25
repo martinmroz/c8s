@@ -213,11 +213,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      a certain token, and either a different one was found or the end of the
      token stream was reached prematurely.
    */
-  fn syntax_error_for_unexpected_token(found: &Option<Token<'a>>, expected: Vec<&'static str>) -> Error<'a> {
+  fn syntax_error_for_unexpected_token(found: &Option<Token<'a>>, expected: &[&'static str]) -> Error<'a> {
     if let &Some(ref token) = found {
-      Error::UnexpectedToken { expected: expected, encountered: token.clone() }
+      Error::UnexpectedToken { expected: Vec::from(expected), encountered: token.clone() }
     } else {
-      Error::UnexpectedEndOfFile(expected)
+      Error::UnexpectedEndOfFile(Vec::from(expected))
     }
   }
 
@@ -232,7 +232,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     match self.consume_token() {
       Some(Token::Identifier(id,loc)) => Ok((id, loc)),
       unexpected @ _ => {
-        let expecting = vec![display_names::IDENTIFIER];
+        let expecting = &[display_names::IDENTIFIER];
         Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting))
       }
     }
@@ -259,7 +259,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
       }
 
       _ => {
-        let expected = vec![display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL];
+        let expected = &[display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL];
         Err(Self::syntax_error_for_unexpected_token(&self.current_token, expected))
       }
     }
@@ -302,7 +302,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     match self.consume_token() {
       Some(Token::DirectiveMarker(_)) => {},
       unexpected @ _ => {
-        let expecting = vec![display_names::DIRECTIVE_MARKER];
+        let expecting = &[display_names::DIRECTIVE_MARKER];
         return Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting));
       }
     }
@@ -325,7 +325,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     match self.consume_token() {
       Some(Token::LabelMarker(_)) => {},
       unexpected @ _ => {
-        let expecting = vec![display_names::LABEL_MARKER];
+        let expecting = &[display_names::LABEL_MARKER];
         return Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting));
       }
     }
@@ -393,7 +393,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // No field discovered.
       _ => {
-        let expecting = vec![display_names::INSTRUCTION_FIELD];
+        let expecting = &[display_names::INSTRUCTION_FIELD];
         return Err(Self::syntax_error_for_unexpected_token(&self.current_token, expecting));
       }
 
@@ -452,7 +452,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     }
 
     // Generate syntax error based on token display names.
-    let expecting = vec![display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER];
+    let expecting = &[display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER];
     Err(Self::syntax_error_for_unexpected_token(&self.current_token, expecting))
   }
 
