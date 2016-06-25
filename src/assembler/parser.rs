@@ -170,26 +170,6 @@ impl<'a> fmt::Display for InstructionField<'a> {
   }
 }
 
-// MARK: - Helper Macros
-
-/**
- Expects the presence of a token matching the given pattern. If found, the 
- token is consumed and the scanner advanced.
- @return The consumed token.
- */
-macro_rules! expect_and_consume {
-  ($parser:expr, $pattern:pat, $name:expr) => {{
-    match $parser.current_token {
-      $pattern => {
-        $parser.consume_token().unwrap()
-      }
-      _ => {
-        return Err($parser.syntax_error_for_unexpected_token(vec![$name]));
-      }
-    }
-  }}
-}
-
 // MARK: - Parser Implementation
 
 impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
@@ -233,8 +213,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
      a certain token, and either a different one was found or the end of the
      token stream was reached prematurely.
    */
-  fn syntax_error_for_unexpected_token(&self, expected: Vec<&'static str>) -> Error<'a> {
-    if let Some(ref token) = self.current_token {
+  fn syntax_error_for_unexpected_token(found: &Option<Token<'a>>, expected: Vec<&'static str>) -> Error<'a> {
+    if let &Some(ref token) = found {
       Error::UnexpectedToken { expected: expected, encountered: token.clone() }
     } else {
       Error::UnexpectedEndOfFile(expected)
@@ -249,10 +229,12 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return The string value of the identifier if successful, or an error.
    */
   fn parse_identifier(&mut self) -> Result<(&'a str, SourceFileLocation<'a>), Error<'a>> {
-    if let Token::Identifier(id,loc) = expect_and_consume!(self, Some(Token::Identifier(_,_)), display_names::IDENTIFIER) {
-      Ok((id, loc))
-    } else {
-      unreachable!()
+    match self.consume_token() {
+      Some(Token::Identifier(id,loc)) => Ok((id, loc)),
+      unexpected @ _ => {
+        let expecting = vec![display_names::IDENTIFIER];
+        Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting))
+      }
     }
   }
 
@@ -278,7 +260,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       _ => {
         let expected = vec![display_names::NUMERIC_LITERAL, display_names::STRING_LITERAL];
-        Err(self.syntax_error_for_unexpected_token(expected))
+        Err(Self::syntax_error_for_unexpected_token(&self.current_token, expected))
       }
     }
   }
@@ -317,7 +299,13 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    @return A directive node if successful, or an error.
    */
   fn parse_directive(&mut self) -> Result<Node<'a>, Error<'a>> {
-    expect_and_consume!(self, Some(Token::DirectiveMarker(_)), display_names::DIRECTIVE_MARKER);
+    match self.consume_token() {
+      Some(Token::DirectiveMarker(_)) => {},
+      unexpected @ _ => {
+        let expecting = vec![display_names::DIRECTIVE_MARKER];
+        return Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting));
+      }
+    }
 
     let ( id,loc ) = try!(self.parse_identifier());
     let parameters = try!(self.parse_literal_list(Vec::new()));
@@ -334,7 +322,13 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
   fn parse_label(&mut self) -> Result<Node<'a>, Error<'a>> {
     let (id, loc) = try!(self.parse_identifier());
 
-    expect_and_consume!(self, Some(Token::LabelMarker(_)), display_names::LABEL_MARKER);
+    match self.consume_token() {
+      Some(Token::LabelMarker(_)) => {},
+      unexpected @ _ => {
+        let expecting = vec![display_names::LABEL_MARKER];
+        return Err(Self::syntax_error_for_unexpected_token(&unexpected, expecting));
+      }
+    }
 
     let label_data = LabelData { location: loc, identifier: id };
     Ok(Node::Label(label_data))
@@ -399,7 +393,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
       // No field discovered.
       _ => {
-        return Err(self.syntax_error_for_unexpected_token(vec![display_names::INSTRUCTION_FIELD]))
+        return Err(Self::syntax_error_for_unexpected_token(&self.current_token, vec![display_names::INSTRUCTION_FIELD]));
       }
 
     };
@@ -458,7 +452,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     // Generate syntax error based on token display names.
     let expecting = vec![display_names::DIRECTIVE_MARKER, display_names::IDENTIFIER];
-    Err(self.syntax_error_for_unexpected_token(expecting))
+    Err(Self::syntax_error_for_unexpected_token(&self.current_token, expecting))
   }
 
   /**
