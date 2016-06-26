@@ -167,7 +167,8 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
 
           // Emit the directive into the range.
           directive @ _ => {
-            assert_eq!(current_range.append(directive.into_vec().as_slice()), true);
+            let bytes = directive.into_vec();
+            assert!(current_range.append(&bytes));
           }
 
         }
@@ -178,8 +179,7 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
         match Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map) {
           Ok(instruction) => {
             let bytes = instruction.into_vec();
-            let appended = current_range.append(&bytes);
-            assert!(appended);
+            assert!(current_range.append(&bytes));
           }
 
           Err(reason) => {
