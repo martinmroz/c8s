@@ -3,8 +3,6 @@ use std::fmt;
 
 use twelve_bit::u12::*;
 
-// TODO: mm: SHL and SHR ignore their Vy parameters on interpretation.
-
 #[allow(non_camel_case_types)]
 #[derive(Eq, PartialEq, Copy, Clone, Debug)]
 pub enum Opcode {
@@ -57,7 +55,7 @@ impl Opcode {
       ((instruction & 0x000F) >>  0) as u8
     );
 
-    let imm12 = (instruction & 0x0FFF).unchecked_into();
+    let imm12: U12 = (instruction & 0x0FFF).unchecked_into();
     let imm8: u8 = (instruction & 0x00FF) as u8;
     let imm4: u8 = (instruction & 0x000F) as u8;
     let register_x = nibbles.1;
@@ -125,9 +123,9 @@ impl Opcode {
       Opcode::XOR             { register_x: x, register_y: y }        => { format!("xor v{:1x}, v{:1x}", x, y) }
       Opcode::ADD_REGISTER    { register_x: x, register_y: y }        => { format!("add v{:1x}, v{:1x}", x, y) }
       Opcode::SUB             { register_x: x, register_y: y }        => { format!("sub v{:1x}, v{:1x}", x, y) }
-      Opcode::SHR             { register_x: x, register_y: y }        => { format!("shr v{:1x}, v{:1x}", x, y) }
+      Opcode::SHR             { register_x: x, register_y: y }        => { format!("shr v{:1x} [, v{:1x}]", x, y) }
       Opcode::SUBN            { register_x: x, register_y: y }        => { format!("subn v{:1x}, v{:1x}", x, y) }
-      Opcode::SHL             { register_x: x, register_y: y }        => { format!("shl v{:1x}, v{:1x}", x, y) }
+      Opcode::SHL             { register_x: x, register_y: y }        => { format!("shl v{:1x} [, v{:1x}]", x, y) }
       Opcode::LD_I            { value }                               => { format!("ld i, ${:3x}", u16::from(value)) }
       Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", u16::from(value)) }
       Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, ${:2x}", x, mask) }
@@ -289,9 +287,9 @@ mod tests {
       /* XOR V5, V6   */ (0x8563, "xor v5, v6"),
       /* ADD V5, V6   */ (0x8564, "add v5, v6"),
       /* SUB V5, V6   */ (0x8565, "sub v5, v6"),
-      /* SHR V5, V6   */ (0x8566, "shr v5, v6"),
+      /* SHR V5       */ (0x8566, "shr v5 [, v6]"),
       /* SUBN V5, V6  */ (0x8567, "subn v5, v6"),
-      /* SHL V5, V6   */ (0x856E, "shl v5, v6"),
+      /* SHL V5       */ (0x856E, "shl v5 [, v6]"),
       /* SNE VE, VF   */ (0x9EF0, "sne ve, vf"),
       /* LD I, $DEF   */ (0xADEF, "ld i, $def"),
       /* JP V0, $234  */ (0xB234, "jp v0, $234"),
