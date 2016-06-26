@@ -7,6 +7,7 @@ use std::mem;
 use twelve_bit::u12::*;
 
 use assembler::data_range::DataRange;
+use assembler::directive;
 use assembler::directive::Directive;
 use assembler::instruction::Instruction;
 use assembler::parser::Node;
@@ -23,7 +24,7 @@ lazy_static! {
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum SemanticError<'a> {
   /// Unable to process an invalid directive.
-  DirectiveInvalid(SourceFileLocation<'a>, String),
+  DirectiveInvalid(SourceFileLocation<'a>, directive::Error),
   /// The directive processed exceeds the size limit of 4096 bytes.
   DirectiveTooLarge(SourceFileLocation<'a>, Directive),
   /// The directive at the specified location would cause the address counter to wrap.
@@ -207,16 +208,9 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
 /**
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
-pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-  let label_address_map = try!(
-    define_labels(&syntax_list).map_err(|error|
-      format!("{}", error)
-    )
-  );
-
-  emit_data_ranges(syntax_list, &label_address_map).map_err(|error|
-    format!("{}", error)
-  )
+pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, SemanticError<'a>> {
+  let label_address_map = try!(define_labels(&syntax_list));
+  emit_data_ranges(syntax_list, &label_address_map)
 }
 
 // MARK: - Tests

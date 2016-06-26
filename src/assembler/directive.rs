@@ -1,9 +1,55 @@
 
+use std::error;
 use std::fmt;
 
 use twelve_bit::u12::*;
 
 use assembler::parser::Literal;
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum Error {
+  /// An invalid number of parameters (`$1`) was specified for `directive` needing `$2` (or more (`$3`)).
+  IncorrectNumberOfParameters(&'static str, usize, usize, bool),
+  /// Directive requires one numeric literal parameter.
+  DirectiveRequiresOneNumericLiteral(&'static str),
+  /// All numeric parameters must be one-byte literals.
+  AllNumericParametersMustBeByteLiterals(&'static str, usize),
+  /// The provided directive was unrecognized.
+  UnrecognizedDirective(String)
+}
+
+impl error::Error for Error {
+  /// Returns a string slice with a general description of a directive error.
+  /// No specific information is contained. To obtain a printable representation,
+  /// use the `fmt::Display` attribute.
+  fn description(&self) -> &str {
+    match self {
+      &Error::IncorrectNumberOfParameters(_,_,_,_)        => "Incorrect number of parameters for directive",
+      &Error::DirectiveRequiresOneNumericLiteral(_)       => "Directive requires one numeric literal",
+      &Error::AllNumericParametersMustBeByteLiterals(_,_) => "All numeric parameters must by one-byte literals",
+      &Error::UnrecognizedDirective(_)                    => "Unrecognized directive",
+    }
+  }
+}
+
+impl fmt::Display for Error {
+  /// Formats the receiver for display purposes. Incorporates specific information
+  /// relating to this particular error instance where applicable.
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &Error::IncorrectNumberOfParameters(directive, count, from, false) =>
+        write!(f, "Incorrect number of parameters ({}) for directive .{}, expecting {}.", count, directive, from),
+      &Error::IncorrectNumberOfParameters(directive, count, from, true) =>
+        write!(f, "Incorrect number of parameters ({}) for directive .{}, expecting {} or more.", count, directive, from),
+      &Error::DirectiveRequiresOneNumericLiteral(directive) =>
+        write!(f, "Directive .{} requires 1 numeric literal in the range $000-$FFF.", directive),
+      &Error::AllNumericParametersMustBeByteLiterals(directive, value_over) =>
+        write!(f, "All numeric parameters to .{} must be 1-byte literals (${:X} > $FF).", directive, value_over),
+      &Error::UnrecognizedDirective(ref identifier) =>
+        write!(f, "Unrecognized directive '.{}'.", identifier),
+    }
+  }
+}
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Directive {
@@ -37,14 +83,14 @@ impl<'a> Directive {
    @param arguments The literal arguments specified for the directive.
    @return Directive in the event the arguments are valid for the directive, or a failure reason.
    */
-  pub fn from_identifier_and_parameters(identifier: &'a str, arguments: &Vec<Literal>) -> Result<Self,String> {
+  pub fn from_identifier_and_parameters(identifier: &'a str, arguments: &Vec<Literal>) -> Result<Self,Error> {
     /*
      The 'org' directive is used to set the current output origin address. The directive requires
      a single numeric literal in the range $000-$FFF.
      */
     if identifier == names::ORG {
       if arguments.len() != 1 {
-        return Err(format!("Incorrect number of parameters ({}) for directive .{}, expecting 1.", arguments.len(), names::ORG));
+        return Err(Error::IncorrectNumberOfParameters(names::ORG, arguments.len(), 1, false));
       }
 
       return match arguments[0] {
@@ -52,7 +98,7 @@ impl<'a> Directive {
           Ok(Directive::Org(a.unchecked_into()))
         }
         _ => {
-          Err(format!("Directive .{} requires 1 numeric literal in the range $000-$FFF.", names::ORG))
+          Err(Error::DirectiveRequiresOneNumericLiteral(names::ORG))
         }
       }
     }
@@ -64,7 +110,7 @@ impl<'a> Directive {
      */
     if identifier == names::DB {
       if arguments.len() == 0 {
-        return Err(format!("Incorrect number of parameters (0) for directive .{}, expecting 1 or more.", names::DB));
+        return Err(Error::IncorrectNumberOfParameters(names::DB, 0, 1, true));
       }
 
       let mut bytes = Vec::new();
@@ -74,7 +120,7 @@ impl<'a> Directive {
         match argument {
           &Literal::Numeric(value) => {
             if value > 0xFF {
-              return Err(format!("All numeric parameters to .{} must be 1-byte literals (${:X} > $FF)", names::DB, value));
+              return Err(Error::AllNumericParametersMustBeByteLiterals(names::DB, value));
             } else {
               bytes.push((value & 0x00FF) as u8);
             }
@@ -88,7 +134,7 @@ impl<'a> Directive {
       return Ok(Directive::Db(bytes));
     }
 
-    Err(format!("Unrecognized directive .{}", identifier))
+    Err(Error::UnrecognizedDirective(String::from(identifier)))
   }
 
   /**
@@ -123,18 +169,35 @@ mod tests {
 
   use assembler::parser::Literal;
 
+  use super::names;
   use super::*;
+
+  #[test]
+  fn test_error_display() {
+    assert_eq!(format!("{}", Error::IncorrectNumberOfParameters(names::ORG, 0, 1, false)),
+      "Incorrect number of parameters (0) for directive .org, expecting 1.");
+    assert_eq!(format!("{}", Error::IncorrectNumberOfParameters(names::ORG, 2, 1, false)),
+      "Incorrect number of parameters (2) for directive .org, expecting 1.");
+    assert_eq!(format!("{}", Error::IncorrectNumberOfParameters(names::ORG, 0, 1, true)),
+      "Incorrect number of parameters (0) for directive .org, expecting 1 or more.");
+    assert_eq!(format!("{}", Error::DirectiveRequiresOneNumericLiteral(names::DB)), 
+      "Directive .db requires 1 numeric literal in the range $000-$FFF.");
+    assert_eq!(format!("{}", Error::AllNumericParametersMustBeByteLiterals(names::ORG, 0x100)),
+      "All numeric parameters to .org must be 1-byte literals ($100 > $FF).");
+    assert_eq!(format!("{}", Error::UnrecognizedDirective(String::from("dw"))), 
+      "Unrecognized directive '.dw'.");
+  }
 
   #[test]
   fn test_validate_directive_semantics_for_org() {
     let mut params = vec![];
-    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err("Incorrect number of parameters (0) for directive .org, expecting 1.".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err(Error::IncorrectNumberOfParameters(names::ORG, 0, 1, false)));
     params = vec![Literal::Numeric(1), Literal::Numeric(3)];
-    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err("Incorrect number of parameters (2) for directive .org, expecting 1.".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err(Error::IncorrectNumberOfParameters(names::ORG, 2, 1, false)));
     params = vec![Literal::Numeric(0x1000)];
-    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err(Error::DirectiveRequiresOneNumericLiteral(names::ORG)));
     params = vec![Literal::String("TEST_STRING")];
-    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err("Directive .org requires 1 numeric literal in the range $000-$FFF.".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("org", &params), Err(Error::DirectiveRequiresOneNumericLiteral(names::ORG)));
     params = vec![Literal::Numeric(0xFFF)];
     assert_eq!(Directive::from_identifier_and_parameters("org", &params), Ok(Directive::Org(u12::MAX)));
     params = vec![Literal::Numeric(0x000)];
@@ -144,9 +207,9 @@ mod tests {
   #[test]
   fn test_validate_directive_semantics_for_db() {
     let mut params = vec![];
-    assert_eq!(Directive::from_identifier_and_parameters("db", &params), Err("Incorrect number of parameters (0) for directive .db, expecting 1 or more.".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("db", &params), Err(Error::IncorrectNumberOfParameters(names::DB, 0, 1, true)));
     params = vec![Literal::Numeric(0x100)];
-    assert_eq!(Directive::from_identifier_and_parameters("db", &params), Err("All numeric parameters to .db must be 1-byte literals ($100 > $FF)".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("db", &params), Err(Error::AllNumericParametersMustBeByteLiterals(names::DB, 0x100)));
     params = vec![Literal::String("TEST_STRING")];
     assert_eq!(Directive::from_identifier_and_parameters("db", &params), Ok(Directive::Db("TEST_STRING".as_bytes().to_vec())));
     params = vec![Literal::Numeric(0xFF)];
@@ -160,9 +223,9 @@ mod tests {
   #[test]
   fn test_validate_directive_semantics_for_invalid_directive() {
     let mut params = vec![];
-    assert_eq!(Directive::from_identifier_and_parameters("dw", &params), Err("Unrecognized directive .dw".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("dw", &params), Err(Error::UnrecognizedDirective(String::from("dw"))));
     params = vec![Literal::Numeric(0x100)];
-    assert_eq!(Directive::from_identifier_and_parameters("dw", &params), Err("Unrecognized directive .dw".to_string()));
+    assert_eq!(Directive::from_identifier_and_parameters("dw", &params), Err(Error::UnrecognizedDirective(String::from("dw"))));
   }
 
   #[test]
