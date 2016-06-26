@@ -188,7 +188,7 @@ impl Opcode {
     }
   }
 
-  pub fn to_formatted_assembly_string(&self, leading_spaces: u8) -> String {
+  pub fn to_formatted_assembly_string(&self, leading_spaces: usize) -> String {
     (0..leading_spaces).map(|_| " ").collect::<String>() + &self.to_string()
   }
 
