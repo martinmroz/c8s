@@ -5,7 +5,7 @@ use twelve_bit::u12::*;
 
 use assembler::parser::Literal;
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub enum Directive {
   /// Directive to set the emit origin to the new address.
   Org(U12),

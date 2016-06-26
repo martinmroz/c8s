@@ -1,5 +1,7 @@
 
 use std::collections::BTreeMap;
+use std::error;
+use std::fmt;
 use std::mem;
 
 use twelve_bit::u12::*;
@@ -13,13 +15,62 @@ use assembler::source_file_location::SourceFileLocation;
 // MARK: - Constants
 
 lazy_static! {
-  static ref BYTES_PER_INSTRUCTION: U12 = U12::from(2);
+  static ref BYTES_PER_INSTRUCTION: U12 = u12![2];
 }
 
-// MARK: - Helper Methods
+// MARK: - Semantic Error
 
-fn format_semantic_error(location: &SourceFileLocation, description: String) -> String {
-  format!("{}: error: {}", location, description)
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub enum SemanticError<'a> {
+  /// Unable to process an invalid directive.
+  DirectiveInvalid(SourceFileLocation<'a>, String),
+  /// The directive processed exceeds the size limit of 4096 bytes.
+  DirectiveTooLarge(SourceFileLocation<'a>, Directive),
+  /// The directive at the specified location would cause the address counter to wrap.
+  DirectiveWouldOverflow(SourceFileLocation<'a>, Directive),
+  /// The instruction at the specified location would cause the addresss counter to wrap.
+  InstructionWouldOverlow(SourceFileLocation<'a>),
+  /// The label specified has already been defined.
+  RedefinitionOfLabel(SourceFileLocation<'a>, String),
+  /// Unable to assemble the specified instruction.
+  AssemblyFailed(SourceFileLocation<'a>, String)
+}
+
+impl<'a> error::Error for SemanticError<'a> {
+  /// Returns a string slice with a general description of a semantic error.
+  /// No specific information is contained. To obtain a printable representation,
+  /// use the `fmt::Display` attribute.
+  fn description(&self) -> &str {
+    match self {
+      &SemanticError::DirectiveInvalid(_,_)       => "Directive invalid",
+      &SemanticError::DirectiveTooLarge(_,_)      => "Directive size exceeds 4096 bytes",
+      &SemanticError::DirectiveWouldOverflow(_,_) => "Directive would cause the 12-bit address counter to overflow",
+      &SemanticError::InstructionWouldOverlow(_)  => "Instruction would cause address counter to overflow $FFF",
+      &SemanticError::RedefinitionOfLabel(_,_)    => "Attempted re-definition of label",
+      &SemanticError::AssemblyFailed(_,_)         => "Unable to assemble instruction",
+    }
+  }
+}
+
+impl<'a> fmt::Display for SemanticError<'a> {
+  /// Formats the receiver for display purposes. Incorporates specific information
+  /// relating to this particular error instance where applicable.
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    match self {
+      &SemanticError::DirectiveInvalid(ref loc, ref reason) =>
+        write!(f, "{}: error: {}", loc, reason),
+      &SemanticError::DirectiveTooLarge(ref loc, ref directive) =>
+        write!(f, "{}: error: Directive ({}) size {} exceeds 4096 bytes.", loc, directive, directive.size()),
+      &SemanticError::DirectiveWouldOverflow(ref loc, ref directive) =>
+        write!(f, "{}: error: Directive ({}) would cause the 12-bit address counter to overflow.", loc, directive),
+      &SemanticError::RedefinitionOfLabel(ref loc, ref label) =>
+        write!(f, "{}: error: Attempted re-definition of label '{}'.", loc, label),
+      &SemanticError::InstructionWouldOverlow(ref loc) =>
+        write!(f, "{}: error: {}.", loc, (self as &error::Error).description()),
+      &SemanticError::AssemblyFailed(ref loc, ref reason) =>
+        write!(f, "{}: error: {}.", loc, reason),
+    }
+  }
 }
 
 // MARK: - Pass 1: Define Labels
@@ -32,7 +83,7 @@ fn format_semantic_error(location: &SourceFileLocation, description: String) -> 
  @return The map of labels to their corresponding addresses on success or a string describing
      the reason the first pass failed.
  */
-fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U12>, String> {
+fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U12>, SemanticError<'a>> {
   let mut label_address_map = BTreeMap::new();
   let mut current_address = u12![0];
 
@@ -41,28 +92,27 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
     match *node {
       Node::Directive(ref data) => {
         // Validate the directive and that the arguments match the identifier.
-        let directive = match Directive::from_identifier_and_parameters(data.identifier, &data.arguments) {
-           Ok(result) => result,
-          Err(reason) => return Err(format_semantic_error(&data.location, reason))
-        };
+        let directive = try!(
+          Directive::from_identifier_and_parameters(data.identifier, &data.arguments)
+            .map_err(|reason| {
+              SemanticError::DirectiveInvalid(data.location.clone(), reason)
+            })
+        );
 
         // Ensure the directive is not too large to emit.
-        let directive_size = match directive.size().failable_into() {
-          Some(size) => size,
-          None => {
-            let reason = format!("Directive ({}) size {} exceeds 4096 bytes.", directive, directive.size());
-            return Err(format_semantic_error(&data.location, reason));
-          }
-        };
+        let directive_size: U12 = try!(
+          directive
+            .size()
+            .failable_into()
+            .ok_or(SemanticError::DirectiveTooLarge(data.location.clone(), directive.clone()))
+        );
 
         // Offset the current address by the size of the directive being processed.
-        current_address = match current_address.checked_add(directive_size) {
-          Some(sum) => sum,
-          None => {
-            let reason = format!("Directive ({}) would cause the 12-bit address counter to overflow.", directive);
-            return Err(format_semantic_error(&data.location, reason));
-          }
-        };
+        current_address = try!(
+          current_address
+            .checked_add(directive_size)
+            .ok_or(SemanticError::DirectiveWouldOverflow(data.location.clone(), directive.clone()))
+        );
 
         // The origin directive changes the current address.
         if let Directive::Org(address) = directive {
@@ -73,8 +123,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
       Node::Label(ref data) => {
         // Map the label to the current address and remove from the ASL.
         if label_address_map.contains_key(&data.identifier) {
-          let reason = format!("Attempted re-definition of label '{}'.", data.identifier);
-          return Err(format_semantic_error(&data.location, reason));
+          return Err(SemanticError::RedefinitionOfLabel(data.location.clone(), String::from(data.identifier)));
         } else {
           label_address_map.insert(data.identifier, current_address);
         }
@@ -82,13 +131,11 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
       Node::Instruction(ref data) => {
         // All Chip8 instructions are the same length.
-        current_address = match current_address.checked_add(*BYTES_PER_INSTRUCTION) {
-          Some(sum) => sum,
-          None => { 
-            let reason = format!("Instruction would cause address counter to overflow $FFF.");
-            return Err(format_semantic_error(&data.location, reason));
-          }
-        };
+        current_address = try!(
+          current_address
+            .checked_add(*BYTES_PER_INSTRUCTION)
+            .ok_or(SemanticError::InstructionWouldOverlow(data.location.clone()))
+        );
       }
     }
   }
@@ -99,7 +146,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
 // MARK: - Pass 2: Emit Bytes
 
-fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, U12>) -> Result<Vec<DataRange>, String> {
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, U12>) -> Result<Vec<DataRange>, SemanticError<'a>> {
   let mut data_ranges = Vec::new();
   let mut current_range = DataRange::new(u12![0]);
 
@@ -130,10 +177,13 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
         // Verify the semantics and append the instruction to the output buffer.
         match Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map) {
           Ok(instruction) => {
-            assert_eq!(current_range.append(instruction.into_vec().as_slice()), true);
+            let bytes = instruction.into_vec();
+            let appended = current_range.append(&bytes);
+            assert!(appended);
           }
+
           Err(reason) => {
-            return Err(format_semantic_error(&data.location, reason));
+            return Err(SemanticError::AssemblyFailed(data.location.clone(), reason));
           }
         }
       }
@@ -159,8 +209,15 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
  Analyze the ASL for the assembly and convert it into an output byte stream.
  */
 pub fn assemble<'a>(syntax_list: Vec<Node<'a>>) -> Result<Vec<DataRange>, String> {
-  let label_address_map = try!(define_labels(&syntax_list));
-  emit_data_ranges(syntax_list, &label_address_map)
+  let label_address_map = try!(
+    define_labels(&syntax_list).map_err(|error|
+      format!("{}", error)
+    )
+  );
+
+  emit_data_ranges(syntax_list, &label_address_map).map_err(|error|
+    format!("{}", error)
+  )
 }
 
 // MARK: - Tests
@@ -245,7 +302,7 @@ mod tests {
     ];
 
     let result = define_labels(&program);
-    assert_eq!(result, Err(String::from("-:1:2-4: error: Incorrect number of parameters (0) for directive .org, expecting 1.")));
+    assert_eq!(format!("{}", result.unwrap_err()), "-:1:2-4: error: Incorrect number of parameters (0) for directive .org, expecting 1.");
   }
 
   #[test]
@@ -255,7 +312,7 @@ mod tests {
     ];
 
     let result = define_labels(&program);
-    assert_eq!(result, Err(String::from("-:1:2-3: error: Incorrect number of parameters (0) for directive .db, expecting 1 or more.")));
+    assert_eq!(format!("{}", result.unwrap_err()), "-:1:2-3: error: Incorrect number of parameters (0) for directive .db, expecting 1 or more.");
   }
 
   #[test]
@@ -266,7 +323,7 @@ mod tests {
     ];
 
     let result = define_labels(&program);
-    assert_eq!(result, Err(String::from("-:2:1-2: error: Attempted re-definition of label 'L1'.")));
+    assert_eq!(format!("{}", result.unwrap_err()), "-:2:1-2: error: Attempted re-definition of label 'L1'.");
   }
 
 }
