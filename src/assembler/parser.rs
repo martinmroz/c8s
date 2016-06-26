@@ -286,11 +286,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
     // A comma following the literal causes the rule to recurse.
     if let Some(Token::Comma(_)) = self.current_token {
       let _ = self.consume_token();
-      result_list = try!(self.parse_literal_list(result_list));
+      return self.parse_literal_list(result_list);
     }
-    
-    // Return the complete list.
-    Ok(result_list)
+
+    return Ok(result_list);
   }
 
   /**
@@ -435,20 +434,17 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
     // A directive is identified by a directive marker.
     if let Some(Token::DirectiveMarker(_)) = self.current_token {
-      let directive_node = try!(self.parse_directive());
-      return Ok(directive_node);
+      return self.parse_directive();
     }
 
     // A label is identified by an id followed by a label marker.
     if let (&Some(Token::Identifier(_,_)), &Some(Token::LabelMarker(_))) = (&self.current_token, &self.next_token) {
-      let label_node = try!(self.parse_label());
-      return Ok(label_node);
+      return self.parse_label();
     }
 
     // Any remaining identifiers should be treated as instructions.
     if let Some(Token::Identifier(_,_)) = self.current_token {
-      let instruction_node = try!(self.parse_instruction());
-      return Ok(instruction_node);
+      return self.parse_instruction();
     }
 
     // Generate syntax error based on token display names.
