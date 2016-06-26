@@ -176,16 +176,15 @@ fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap
 
       Node::Instruction(data) => {
         // Verify the semantics and append the instruction to the output buffer.
-        match Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map) {
-          Ok(instruction) => {
-            let bytes = instruction.into_vec();
-            assert!(current_range.append(&bytes));
-          }
+        let instruction = try!(
+          Instruction::from_mnemonic_and_parameters(data.mnemonic, &data.fields, label_address_map)
+            .map_err(|reason| {
+              SemanticError::AssemblyFailed(data.location.clone(), reason)
+            })
+        );
 
-          Err(reason) => {
-            return Err(SemanticError::AssemblyFailed(data.location.clone(), reason));
-          }
-        }
+        let bytes = instruction.into_vec();
+        assert!(current_range.append(&bytes));
       }
 
       Node::Label(_) => { 
