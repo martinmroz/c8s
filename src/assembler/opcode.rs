@@ -123,9 +123,9 @@ impl Opcode {
       Opcode::XOR             { register_x: x, register_y: y }        => { format!("xor v{:1x}, v{:1x}", x, y) }
       Opcode::ADD_REGISTER    { register_x: x, register_y: y }        => { format!("add v{:1x}, v{:1x}", x, y) }
       Opcode::SUB             { register_x: x, register_y: y }        => { format!("sub v{:1x}, v{:1x}", x, y) }
-      Opcode::SHR             { register_x: x, register_y: y }        => { format!("shr v{:1x} [, v{:1x}]", x, y) }
+      Opcode::SHR             { register_x: x, register_y: _ }        => { format!("shr v{:1x}", x) }
       Opcode::SUBN            { register_x: x, register_y: y }        => { format!("subn v{:1x}, v{:1x}", x, y) }
-      Opcode::SHL             { register_x: x, register_y: y }        => { format!("shl v{:1x} [, v{:1x}]", x, y) }
+      Opcode::SHL             { register_x: x, register_y: _ }        => { format!("shl v{:1x}", x) }
       Opcode::LD_I            { value }                               => { format!("ld i, ${:3x}", u16::from(value)) }
       Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", u16::from(value)) }
       Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, ${:2x}", x, mask) }
@@ -287,9 +287,9 @@ mod tests {
       /* XOR V5, V6   */ (0x8563, "xor v5, v6"),
       /* ADD V5, V6   */ (0x8564, "add v5, v6"),
       /* SUB V5, V6   */ (0x8565, "sub v5, v6"),
-      /* SHR V5       */ (0x8566, "shr v5 [, v6]"),
+      /* SHR V5       */ (0x8566, "shr v5"),
       /* SUBN V5, V6  */ (0x8567, "subn v5, v6"),
-      /* SHL V5       */ (0x856E, "shl v5 [, v6]"),
+      /* SHL V5       */ (0x856E, "shl v5"),
       /* SNE VE, VF   */ (0x9EF0, "sne ve, vf"),
       /* LD I, $DEF   */ (0xADEF, "ld i, $def"),
       /* JP V0, $234  */ (0xB234, "jp v0, $234"),
