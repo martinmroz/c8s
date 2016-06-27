@@ -53,7 +53,7 @@
 ; VE     Score
 ; VF     collision detection
 
-.org $200
+.ORG $200
 
     LD  VA, 2  ; Set left player X coord.
     LD  VB, 12 ; Set left player Y coord.
