@@ -159,12 +159,12 @@ impl<'a> fmt::Display for InstructionField<'a> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       &InstructionField::NumericLiteral(value)      => write!(f, "literal:${:x}", usize::from(value)),
-      &InstructionField::GeneralPurposeRegister(r)  => write!(f, "register:v{:x}", r),
-      &InstructionField::DelayTimer                 => write!(f, "delay-timer"),
-      &InstructionField::SoundTimer                 => write!(f, "sound-timer"),
-      &InstructionField::KeypadRegister             => write!(f, "keypad"),
-      &InstructionField::IndexRegister              => write!(f, "index"),
-      &InstructionField::IndexRegisterIndirect      => write!(f, "[index]"),
+      &InstructionField::GeneralPurposeRegister(r)  => write!(f, "register:{:x}", r),
+      &InstructionField::DelayTimer                 => write!(f, "register:delay-timer"),
+      &InstructionField::SoundTimer                 => write!(f, "register:sound-timer"),
+      &InstructionField::KeypadRegister             => write!(f, "register:keypad"),
+      &InstructionField::IndexRegister              => write!(f, "register:index"),
+      &InstructionField::IndexRegisterIndirect      => write!(f, "register-indirect:[index]"),
       &InstructionField::Identifier(id)             => write!(f, "identifier:{}", id)
     }
   }

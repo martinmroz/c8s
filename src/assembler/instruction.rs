@@ -25,7 +25,7 @@ impl error::Error for Error {
       &Error::UnableToResolveAddressOfLabel(_)  => "Unable to resolve address of label",
       &Error::ExpectingEightBitValue(_)         => "Found 12-bit numeric literal, expecting 8-bit value",
       &Error::ExpectingFourBitValue(_)          => "Found 8/12-bit numeric literal, expecting 4-bit value",
-      &Error::NoMatchingFormat(_,_)             => "No matching format for instruction",
+      &Error::NoMatchingFormat(_,_)             => "No matching instruction",
     }
   }
 }
@@ -42,9 +42,9 @@ impl fmt::Display for Error {
       &Error::ExpectingFourBitValue(actual) =>
         write!(f, "Found 8/12-bit numeric literal ${:X}, expecting 4-bit value.", actual),
       &Error::NoMatchingFormat(ref mnemonic, Some(ref fields)) =>
-        write!(f, "No matching format for instruction: {} {}.", mnemonic, fields),
+        write!(f, "No matching instruction: {} {}.", mnemonic, fields),
       &Error::NoMatchingFormat(ref mnemonic, None) =>
-        write!(f, "No matching format for instruction: {}.", mnemonic),
+        write!(f, "No matching instruction: {}.", mnemonic),
     }
   }
 }
@@ -355,10 +355,10 @@ mod tests {
       "Found 12-bit numeric literal $100, expecting 8-bit value.");
     assert_eq!(format!("{}", Error::ExpectingFourBitValue(0x10)),
       "Found 8/12-bit numeric literal $10, expecting 4-bit value.");
-    assert_eq!(format!("{}", Error::NoMatchingFormat(String::from("jp"), Some(String::from("v0")))),
-      "No matching format for instruction: jp v0.");
+    assert_eq!(format!("{}", Error::NoMatchingFormat(String::from("jp"), Some(String::from("register:0")))),
+      "No matching instruction: jp register:0.");
     assert_eq!(format!("{}", Error::NoMatchingFormat(String::from("jp"), None)),
-      "No matching format for instruction: jp.");
+      "No matching instruction: jp.");
   }
 
   #[test]
@@ -441,7 +441,7 @@ mod tests {
     // Failure Mode 1: Just v0.
     let invalid_jp_v0 = Instruction::from_mnemonic_and_parameters("jp", &vec![v0_field.clone()], &empty_map);
     assert_eq!(invalid_jp_v0.is_err(), true);
-    assert_eq!(invalid_jp_v0.unwrap_err(), Error::NoMatchingFormat(String::from("jp"), Some(String::from("register:v0"))));
+    assert_eq!(invalid_jp_v0.unwrap_err(), Error::NoMatchingFormat(String::from("jp"), Some(String::from("register:0"))));
 
     // Failure Mode 2: Undefined Label.
     let label_field = InstructionField::Identifier("TEST_LABEL");
