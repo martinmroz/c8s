@@ -343,9 +343,10 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
    */
   fn parse_field_list(&mut self, list: Vec<InstructionField<'a>>) -> Result<Vec<InstructionField<'a>>, Error<'a>> {
 
-    // The field list is complete.
-    if let Some(Token::Newline(_)) = self.current_token {
-      return Ok(list);
+    // The field list is complete on Newline or Single-Line Comment.
+    match self.current_token {
+      Some(Token::Newline(_)) | Some(Token::SingleLineComment(_,_)) => return Ok(list),
+      _ => {}
     }
 
     let field = match self.current_token {
@@ -777,6 +778,40 @@ mod tests {
 
     // Test an instruction with a heterogenous field list.
     parser = Parser::new(Scanner::new("-", "drw v1, v2, $fe\n"));
+    expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 3),
+      mnemonic: "drw", 
+      fields: vec![
+        InstructionField::GeneralPurposeRegister(1),
+        InstructionField::GeneralPurposeRegister(2),
+        InstructionField::NumericLiteral(U12::from(254))
+      ]
+    };
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
+  }
+
+  #[test]
+  fn test_parse_instruction_trailing_comment() {
+    // Test an instruction with no fields and a trailing comment.
+    let mut parser = Parser::new(Scanner::new("-", "nop;test_comment\n"));
+    let mut expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 3),
+      mnemonic: "nop",
+      fields: vec![]
+    };
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
+
+    // Test an instruction with one address target and a trailing comment.
+    parser = Parser::new(Scanner::new("-", "jp $002;test_comment\n"));
+    expected_data = InstructionData {
+      location: SourceFileLocation::new("-", 1, 1, 2),
+      mnemonic: "jp",
+      fields: vec![ InstructionField::NumericLiteral(U12::from(2)) ]
+    };
+    assert_eq!(parser.parse_instruction(), Ok(Node::Instruction(expected_data)));
+
+    // Test an instruction with a heterogenous field list, a trailing comma and comment.
+    parser = Parser::new(Scanner::new("-", "drw v1, v2, $fe, ;test_comment\n"));
     expected_data = InstructionData {
       location: SourceFileLocation::new("-", 1, 1, 3),
       mnemonic: "drw", 

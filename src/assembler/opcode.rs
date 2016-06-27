@@ -130,8 +130,8 @@ impl Opcode {
       Opcode::JP_V0           { value }                               => { format!("jp v0, ${:3x}", u16::from(value)) }
       Opcode::RND             { register_x: x, mask }                 => { format!("rnd v{:1x}, ${:2x}", x, mask) }
       Opcode::DRW             { register_x: x, register_y: y, bytes}  => { format!("drw v{:1x}, v{:1x}, ${:1x}", x, y, bytes) }
-      Opcode::SE_K            { register_x: x }                       => { format!("se v{:1x}, k", x) }
-      Opcode::SNE_K           { register_x: x }                       => { format!("sne v{:1x}, k", x) }
+      Opcode::SE_K            { register_x: x }                       => { format!("skp v{:1x}", x) }
+      Opcode::SNE_K           { register_x: x }                       => { format!("sknp v{:1x}", x) }
       Opcode::LD_X_DT         { register_x: x }                       => { format!("ld v{:1x}, dt", x) }
       Opcode::LD_X_K          { register_x: x }                       => { format!("ld v{:1x}, k", x) }
       Opcode::LD_DT_X         { register_x: x }                       => { format!("ld dt, v{:1x}", x) }
@@ -295,8 +295,8 @@ mod tests {
       /* JP V0, $234  */ (0xB234, "jp v0, $234"),
       /* RND V1, $8F  */ (0xC18F, "rnd v1, $8f"),
       /* DRW V2,V3,$4 */ (0xD234, "drw v2, v3, $4"),
-      /* SE V1, K     */ (0xE19E, "se v1, k"),
-      /* SNE V1, K    */ (0xE1A1, "sne v1, k"),
+      /* SKP V1       */ (0xE19E, "skp v1"),
+      /* SKNP V1      */ (0xE1A1, "sknp v1"),
       /* LD V2, DT    */ (0xF207, "ld v2, dt"),
       /* LD V3, K     */ (0xF30A, "ld v3, k"),
       /* LD DT, V3    */ (0xF315, "ld dt, v3"),

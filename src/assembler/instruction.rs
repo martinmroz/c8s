@@ -140,6 +140,10 @@ impl<'a> Instruction {
 
         ("shl", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SHL { register_x: x, register_y: 0 }),
 
+        ("skp", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SE_K { register_x: x }),
+
+        ("sknp", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SNE_K { register_x: x }),
+
         _ => None
       }
     }
@@ -221,14 +225,6 @@ impl<'a> Instruction {
 
         ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
           Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(value)) })
-        }
-
-        ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
-          Some(Opcode::SE_K { register_x: x })
-        }
-
-        ("sne", &InstructionField::GeneralPurposeRegister(x), &InstructionField::KeypadRegister) => {
-          Some(Opcode::SNE_K { register_x: x })
         }
 
         ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::DelayTimer) => {
@@ -502,8 +498,7 @@ mod tests {
     assert_eq!(invalid_se_imm.unwrap_err(), Error::ExpectingEightBitValue(0x100));
 
     // Skip next if key represented by vX is pressed.
-    let keypad_field = InstructionField::KeypadRegister;
-    let se_k = Instruction::from_mnemonic_and_parameters("se", &vec![register_field_1, keypad_field], &empty_map).unwrap();
+    let se_k = Instruction::from_mnemonic_and_parameters("skp", &vec![register_field_1], &empty_map).unwrap();
     assert_eq!(se_k.size(), 2);
     assert_eq!(se_k.0, Opcode::SE_K { register_x: 1 });
   }
@@ -532,8 +527,7 @@ mod tests {
     assert_eq!(invalid_sne_imm.unwrap_err(), Error::ExpectingEightBitValue(0x100));
 
     // Skip next if key represented by vX is NOT pressed.
-    let keypad_field = InstructionField::KeypadRegister;
-    let sne_k = Instruction::from_mnemonic_and_parameters("sne", &vec![register_field_1, keypad_field], &empty_map).unwrap();
+    let sne_k = Instruction::from_mnemonic_and_parameters("sknp", &vec![register_field_1], &empty_map).unwrap();
     assert_eq!(sne_k.size(), 2);
     assert_eq!(sne_k.0, Opcode::SNE_K { register_x: 1 });
   }

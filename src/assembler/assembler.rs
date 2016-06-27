@@ -82,9 +82,9 @@ impl<'a> fmt::Display for SemanticError<'a> {
       &SemanticError::RedefinitionOfLabel(ref loc, ref label) =>
         write!(f, "{}: error: Attempted re-definition of label '{}'.", loc, label),
       &SemanticError::InstructionWouldOverlow(ref loc) =>
-        write!(f, "{}: error: {}.", loc, (self as &error::Error).description()),
+        write!(f, "{}: error: {}", loc, (self as &error::Error).description()),
       &SemanticError::AssemblyFailed(ref loc, ref reason) =>
-        write!(f, "{}: error: {}.", loc, reason),
+        write!(f, "{}: error: {}", loc, reason),
     }
   }
 }
