@@ -23,12 +23,12 @@ use assembler::scanner::Scanner;
 
 // MARK: - Assembler
 
-fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F : Fn(&str) -> () {
+fn assemble_file<F>(input_path: &str, output_path: &str, log_program_error: F) where F : Fn(&str) -> () {
 
   // Open the input file (read-only).
   let mut input_file = File::open(input_path).unwrap_or_else(|reason| {
-    log_error(&format!("Unable to open input file '{}'", input_path));
-    log_error(&reason.to_string());
+    log_program_error(&format!("Unable to open input file '{}'", input_path));
+    log_program_error(&reason.to_string());
     process::exit(1);
   });
 
@@ -36,8 +36,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
 
   // Read the contents of the input file into the buffer.
   input_file.read_to_string(&mut buffer).unwrap_or_else(|reason| {
-    log_error(&format!("Unable to read contents of input file '{}'", input_path));
-    log_error(&reason.to_string());
+    log_program_error(&format!("Unable to read contents of input file '{}'", input_path));
+    log_program_error(&reason.to_string());
     process::exit(1);
   });
 
@@ -59,13 +59,13 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
   // Verify no overlapping data ranges exist in the result.
   let overlapping_ranges = data_range::find_overlapping_ranges(&data_ranges);
   if overlapping_ranges.len() > 0 {
-    log_error("Input file specifies overlapping data ranges.");
-    log_error("Data from one section has overflowed into the adjacent.");
+    log_program_error("Input file specifies overlapping data ranges.");
+    log_program_error("Data from one section has overflowed into the adjacent.");
 
     // Emit overlapping data range information.
     for (a, b) in overlapping_ranges {
-      log_error(&format!("  range {} overlaps with:", a));
-      log_error(&format!("  range {}", b));
+      log_program_error(&format!("  range {} overlaps with:", a));
+      log_program_error(&format!("  range {}", b));
     }
 
     process::exit(1);
@@ -80,8 +80,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
     path @ _ => {
       Box::new(
         File::create(output_path).unwrap_or_else(|reason| {
-          log_error(&format!("Unable to create output file '{}'", path));
-          log_error(&reason.to_string());
+          log_program_error(&format!("Unable to create output file '{}'", path));
+          log_program_error(&reason.to_string());
           process::exit(1);
         })
       )
@@ -90,8 +90,8 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_error: F) where F :
 
   // Write the result to the output file.
   output_file.write_all(result.as_bytes()).unwrap_or_else(|reason| {
-    log_error(&format!("Unable to write result to output file '{}'", output_path));
-    log_error(&reason.to_string());
+    log_program_error(&format!("Unable to write result to output file '{}'", output_path));
+    log_program_error(&reason.to_string());
     process::exit(1);
   });
 }
