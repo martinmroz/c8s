@@ -283,20 +283,22 @@ impl<'a> Instruction {
       }
     }
 
-    // Assemble the matched instruction.
-    return match opcode {
-      Some(value) => Ok(Instruction(value)),
-      None => {
-        match fields.len() {
-          0 => Err(Error::NoMatchingFormat(String::from(mnemonic), None)),
+    opcode
+      // Create an Instruction out of the Opcode in the event of success.
+      .map(|assembled_opcode| {
+        Instruction(assembled_opcode)
+      })
+      // Generate a NoMatchingFormat error in the event of failure.
+      .ok_or_else(|| {
+        Error::NoMatchingFormat(String::from(mnemonic), match fields.len() {
+          0 => None,
           _ => {
             let field_strings = fields.iter().map(|field| format!("{}", field));
-            let field_description = field_strings.collect::<Vec<_>>().join(",");
-            Err(Error::NoMatchingFormat(String::from(mnemonic), Some(field_description)))
+            let field_description = field_strings.collect::<Vec<_>>().join(", ");
+            Some(field_description)
           }
-        }
-      }
-    };
+        })
+      })
 	}
 
   /**
