@@ -147,5 +147,5 @@ in_reserved_area:
   SAVE [I], VF            ; FF55 or LD [I], VF
 
   RESTORE V0, [I]         ; F065 or LD V0, [I]
-  RESTORE V0, [I]         ; F165 or LD V1, [I]
-  RESTORE V0, [I]         ; FF65 or LD VF, [I]
+  RESTORE V1, [I]         ; F165 or LD V1, [I]
+  RESTORE VF, [I]         ; FF65 or LD VF, [I]
