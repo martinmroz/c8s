@@ -101,8 +101,12 @@ impl<'a> Instruction {
 	 @param label_map A reference to a map of labels to their defined address values.
 	 @return The assembled instruction if successful or a string describing the failure otherwise.
 	 */
-	pub fn from_mnemonic_and_parameters(mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, U12>) -> Result<Self, Error> {
+	pub fn from_mnemonic_and_parameters(input_mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, U12>) -> Result<Self, Error> {
 		let mut opcode: Option<Opcode> = None;
+
+    // Mnemonics match case-insensitive.
+    let lowercase_mnemonic_string = String::from(input_mnemonic).to_lowercase();
+    let mnemonic = lowercase_mnemonic_string.as_str();
 
     // Mnemonics with zero parameters.
     if fields.len() == 0 {
@@ -298,7 +302,7 @@ impl<'a> Instruction {
       })
       // Generate a NoMatchingFormat error in the event of failure.
       .ok_or_else(|| {
-        Error::NoMatchingFormat(String::from(mnemonic), match fields.len() {
+        Error::NoMatchingFormat(String::from(input_mnemonic), match fields.len() {
           0 => None,
           _ => {
             let field_strings = fields.iter().map(|field| format!("{}", field));

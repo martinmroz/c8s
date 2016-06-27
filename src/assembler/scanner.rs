@@ -214,9 +214,13 @@ impl<'a> Scanner<'a> {
    */
   fn consume_index_register_indirect(&mut self) -> Token<'a> {
     let index_register_indirect = "[i]";
+    let index_register_indirect_upper = "[I]";
+
+    // Offset the input to the current position.
+    let slice = &self.input[self.position .. ];
 
     // The Index Register Indirect identifier, [i] is consumed as an identifier.
-    if self.input[self.position .. ].starts_with(index_register_indirect) {
+    if slice.starts_with(index_register_indirect) || slice.starts_with(index_register_indirect_upper) {
       let length = index_register_indirect.len();
       let slice = &self.input[self.position .. self.position + length];
       let location = self.advance_by(length);

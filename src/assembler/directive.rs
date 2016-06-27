@@ -83,7 +83,10 @@ impl<'a> Directive {
    @param arguments The literal arguments specified for the directive.
    @return Directive in the event the arguments are valid for the directive, or a failure reason.
    */
-  pub fn from_identifier_and_parameters(identifier: &'a str, arguments: &Vec<Literal>) -> Result<Self,Error> {
+  pub fn from_identifier_and_parameters(input_identifier: &'a str, arguments: &Vec<Literal>) -> Result<Self,Error> {
+    let identifer_string_lowercase = String::from(input_identifier).to_lowercase();
+    let identifier = identifer_string_lowercase.as_str();
+
     /*
      The 'org' directive is used to set the current output origin address. The directive requires
      a single numeric literal in the range $000-$FFF.
@@ -134,7 +137,7 @@ impl<'a> Directive {
       return Ok(Directive::Db(bytes));
     }
 
-    Err(Error::UnrecognizedDirective(String::from(identifier)))
+    Err(Error::UnrecognizedDirective(String::from(input_identifier)))
   }
 
   /**

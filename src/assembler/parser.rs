@@ -363,11 +363,11 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
         let identifier_field = match id {
 
           // Match special-purpose registers.
-           "dt" => InstructionField::DelayTimer,
-           "st" => InstructionField::SoundTimer,
-            "i" => InstructionField::IndexRegister,
-          "[i]" => InstructionField::IndexRegisterIndirect,
-            "k" => InstructionField::KeypadRegister,
+           "dt" | "DT"  => InstructionField::DelayTimer,
+           "st" | "ST"  => InstructionField::SoundTimer,
+            "i" | "I"   => InstructionField::IndexRegister,
+          "[i]" | "[I]" => InstructionField::IndexRegisterIndirect,
+            "k" | "K"   => InstructionField::KeypadRegister,
 
           // Now it's a GPR or an Identifier.
           identifier_string @ _ => {
@@ -375,7 +375,7 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
 
             // If the identifier matches ("v"[0-9a-fA-F]), it's a GPR.
             let id_length = identifier_string.chars().count();
-            if (id_length == 2) && identifier_string.starts_with("v") {
+            if (id_length == 2) && (identifier_string.starts_with("v") || identifier_string.starts_with("V")) {
               let numeric_portion = &identifier_string['v'.len_utf8() .. ];
               if let Some(value) = u8::from_str_radix(numeric_portion, 16).ok() {
                 field = InstructionField::GeneralPurposeRegister(value);
