@@ -126,7 +126,7 @@ impl<'a> Scanner<'a> {
    */
   fn consume_hex_literal(&mut self) -> Token<'a> {
     lazy_static! {
-       static ref HEX_LITERAL: Regex = Regex::new(r#"^\$[0-9a-fA-F]{1,3}"#).unwrap();
+       static ref HEX_LITERAL: Regex = Regex::new(r#"^[\$\#][0-9a-fA-F]{1,3}"#).unwrap();
     }
     match HEX_LITERAL.find(&self.input[self.position .. ]) {
       Some((0, byte_index_end)) => {
@@ -354,6 +354,7 @@ impl<'a> Scanner<'a> {
       ',' => { Some(self.consume_comma()) }
       '"' => { Some(self.consume_string_literal()) }
       '$' => { Some(self.consume_hex_literal()) }
+      '#' => { Some(self.consume_hex_literal()) }
       '[' => { Some(self.consume_index_register_indirect()) }
       
       '0' ... '9' => {
@@ -529,6 +530,23 @@ mod tests {
   #[test]
   fn test_numeric_literal_hex() {
     let mut scanner = Scanner::new("-", "$0 $00 $000 $1 $F $FF $1FF $1_0 $");
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new("-", 1, 1, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new("-", 1, 4, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new("-", 1, 8, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 13, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF, SourceFileLocation::new("-", 1, 16, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF, SourceFileLocation::new("-", 1, 19, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new("-", 1, 23, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 28, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 30, 2))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::InvalidHexadecimalLiteral, SourceFileLocation::new("-", 1, 33, 1))));
+    assert_eq!(scanner.next(), None);
+    assert_eq!(scanner.is_at_end(), true);
+  }
+
+  #[test]
+  fn test_numeric_literal_alternate_leading_indicator() {
+    let mut scanner = Scanner::new("-", "#0 #00 #000 #1 #F #FF #1FF #1_0 #");
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new("-", 1, 1, 2))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new("-", 1, 4, 3))));
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new("-", 1, 8, 4))));
