@@ -70,7 +70,6 @@
     LD  V6, 3 ; Set X coord. of ball to 3
     LD  V8, 2 ; Set ball X direction to right
 
-
 Big_Loop:
 
     LD  V0, #60 ; Set V0=delay before ball launch
