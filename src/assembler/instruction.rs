@@ -120,7 +120,9 @@ impl<'a> Instruction {
     if fields.len() == 1 {
       opcode = match (mnemonic, fields.get(0).unwrap()) {
 
-        ("jp", &InstructionField::NumericLiteral(target)) => Some(Opcode::JP { target: target }),
+        ("jp", &InstructionField::NumericLiteral(target)) => {
+          Some(Opcode::JP { target: target })
+        }
 
         // The 'jp' mnemonic may reference a label.
         ("jp", &InstructionField::Identifier(label)) => {
@@ -128,7 +130,9 @@ impl<'a> Instruction {
           Some(Opcode::JP { target: address })
         }
 
-        ("call", &InstructionField::NumericLiteral(target)) => Some(Opcode::CALL { target: target }),
+        ("call", &InstructionField::NumericLiteral(target)) => {
+          Some(Opcode::CALL { target: target })
+        }
 
         // The 'call' mnemonic may reference a label.
         ("call", &InstructionField::Identifier(label)) => {
@@ -136,13 +140,21 @@ impl<'a> Instruction {
           Some(Opcode::CALL { target: address })
         }
 
-        ("shr", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SHR { register_x: x, register_y: 0 }),
+        ("shr", &InstructionField::GeneralPurposeRegister(x)) => {
+          Some(Opcode::SHR { register_x: x, register_y: 0 })
+        }
 
-        ("shl", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SHL { register_x: x, register_y: 0 }),
+        ("shl", &InstructionField::GeneralPurposeRegister(x)) => {
+          Some(Opcode::SHL { register_x: x, register_y: 0 })
+        }
 
-        ("skp", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SE_K { register_x: x }),
+        ("skp", &InstructionField::GeneralPurposeRegister(x)) => {
+          Some(Opcode::SE_K { register_x: x })
+        }
 
-        ("sknp", &InstructionField::GeneralPurposeRegister(x)) => Some(Opcode::SNE_K { register_x: x }),
+        ("sknp", &InstructionField::GeneralPurposeRegister(x)) => {
+          Some(Opcode::SNE_K { register_x: x })
+        }
 
         _ => None
       }
