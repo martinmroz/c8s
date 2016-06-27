@@ -9,6 +9,7 @@ use twelve_bit::u12::*;
 use assembler::data_range::DataRange;
 use assembler::directive;
 use assembler::directive::Directive;
+use assembler::instruction;
 use assembler::instruction::Instruction;
 use assembler::parser::Node;
 use assembler::source_file_location::SourceFileLocation;
@@ -34,10 +35,11 @@ pub enum SemanticError<'a> {
   /// The label specified has already been defined.
   RedefinitionOfLabel(SourceFileLocation<'a>, String),
   /// Unable to assemble the specified instruction.
-  AssemblyFailed(SourceFileLocation<'a>, String)
+  AssemblyFailed(SourceFileLocation<'a>, instruction::Error)
 }
 
 impl<'a> error::Error for SemanticError<'a> {
+
   /// Returns a string slice with a general description of a semantic error.
   /// No specific information is contained. To obtain a printable representation,
   /// use the `fmt::Display` attribute.
@@ -51,6 +53,19 @@ impl<'a> error::Error for SemanticError<'a> {
       &SemanticError::AssemblyFailed(_,_)         => "Unable to assemble instruction",
     }
   }
+
+  /// Returns the underlying error which caused the receiver.
+  fn cause(&self) -> Option<&error::Error> {
+    match self {
+      &SemanticError::DirectiveInvalid(_, ref error) => 
+        Some(error),
+      &SemanticError::AssemblyFailed(_, ref error) => 
+        Some(error),
+      _ =>
+        None,
+    }
+  }
+
 }
 
 impl<'a> fmt::Display for SemanticError<'a> {
