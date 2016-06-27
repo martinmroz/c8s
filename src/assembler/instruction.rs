@@ -441,7 +441,7 @@ mod tests {
     // Failure Mode 1: Just v0.
     let invalid_jp_v0 = Instruction::from_mnemonic_and_parameters("jp", &vec![v0_field.clone()], &empty_map);
     assert_eq!(invalid_jp_v0.is_err(), true);
-    assert_eq!(invalid_jp_v0.unwrap_err(), Error::NoMatchingFormat(String::from("jp"), Some(String::from("v0"))));
+    assert_eq!(invalid_jp_v0.unwrap_err(), Error::NoMatchingFormat(String::from("jp"), Some(String::from("register:v0"))));
 
     // Failure Mode 2: Undefined Label.
     let label_field = InstructionField::Identifier("TEST_LABEL");
