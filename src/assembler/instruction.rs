@@ -311,7 +311,7 @@ impl<'a> Instruction {
           }
         })
       })
-	}
+  }
 
   /**
    @return The size of the instruction in the output stream in bytes (always 2).
