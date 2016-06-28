@@ -93,16 +93,16 @@ fn numeric_literal_to_4_bit_field(literal: U12) -> Result<u8, Error> {
 
 impl<'a> Instruction {
 
-	/**
-	 Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
-	 label resolution map). Produces an error message in the event of failure.
-	 @param mnemonic The (all lowercase) instruction mnemonic.
-	 @param fields A vector of instruction fields.
-	 @param label_map A reference to a map of labels to their defined address values.
-	 @return The assembled instruction if successful or a string describing the failure otherwise.
-	 */
-	pub fn from_mnemonic_and_parameters(input_mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, U12>) -> Result<Self, Error> {
-		let mut opcode: Option<Opcode> = None;
+  /**
+   Converts a mnemonic string and a list of associated fields into an opcode (with the help of a
+   label resolution map). Produces an error message in the event of failure.
+   @param mnemonic The (all lowercase) instruction mnemonic.
+   @param fields A vector of instruction fields.
+   @param label_map A reference to a map of labels to their defined address values.
+   @return The assembled instruction if successful or a string describing the failure otherwise.
+   */
+  pub fn from_mnemonic_and_parameters(input_mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, U12>) -> Result<Self, Error> {
+    let mut opcode: Option<Opcode> = None;
 
     // Mnemonics match case-insensitive.
     let lowercase_mnemonic_string = String::from(input_mnemonic).to_lowercase();
