@@ -137,10 +137,10 @@ impl Opcode {
       Opcode::LD_DT_X         { register_x: x }                       => { format!("ld dt, v{:1x}", x) }
       Opcode::LD_ST_X         { register_x: x }                       => { format!("ld st, v{:1x}", x) }
       Opcode::ADD_I_X         { register_x: x }                       => { format!("add i, v{:1x}", x) }
-      Opcode::SPRITE_I        { register_x: x }                       => { format!("sprite i, v{:1x}", x) }
-      Opcode::BCD_I           { register_x: x }                       => { format!("bcd [i], v{:1x}", x) }
-      Opcode::SAVE_I          { register_x: x }                       => { format!("save [i], v{:1x}", x) }
-      Opcode::RESTORE_I       { register_x: x }                       => { format!("restore v{:1x}, [i]", x) }
+      Opcode::SPRITE_I        { register_x: x }                       => { format!("ld f, v{:1x}", x) }
+      Opcode::BCD_I           { register_x: x }                       => { format!("ld b, v{:1x}", x) }
+      Opcode::SAVE_I          { register_x: x }                       => { format!("ld [i], v{:1x}", x) }
+      Opcode::RESTORE_I       { register_x: x }                       => { format!("ld v{:1x}, [i]", x) }
     }
   }
 
@@ -302,10 +302,10 @@ mod tests {
       /* LD DT, V3    */ (0xF315, "ld dt, v3"),
       /* LD ST, V3    */ (0xF318, "ld st, v3"),
       /* ADD I, V5    */ (0xF51E, "add i, v5"),
-      /* SPRITE V6    */ (0xF629, "sprite i, v6"),
-      /* BCD [I], V7  */ (0xF733, "bcd [i], v7"),
-      /* SAVE [I], VE */ (0xFE55, "save [i], ve"),
-      /* RSTR VF, [I] */ (0xFF65, "restore vf, [i]")
+      /* LD F, V6     */ (0xF629, "ld f, v6"),
+      /* LD B, V7     */ (0xF733, "ld b, v7"),
+      /* LD [I], VE   */ (0xFE55, "ld [i], ve"),
+      /* LD VF, [I]   */ (0xFF65, "ld vf, [i]")
     ];
 
     for &(instruction, assembly_string) in test_cases.iter() {
