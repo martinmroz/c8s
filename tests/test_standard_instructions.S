@@ -1,9 +1,9 @@
 
-.org $000
+.ORG $000
 start_of_memory:
-.org $100
+.ORG $100
 in_reserved_area:
-.org $200
+.ORG $200
 
   NOP                     ; 0000
   CLS                     ; 00E0

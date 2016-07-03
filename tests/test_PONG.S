@@ -219,7 +219,7 @@ Draw_Score:
     LD  V5, 0       ; Set V5 to the Y coord. to draw 1st score char
     DRW V4, V5, 5   ; Draw 8*5 sprite at (V4,V5) from M[I], so char V1
     ADD V4, #15     ; Set X to the X coord. of 2nd score char
-    LD  F, V2       ; I points to hex char in V2, so 2nd score char
+    LD  F,  V2      ; I points to hex char in V2, so 2nd score char
     DRW V4, V5, 5   ; Draw 8*5 sprite at (V4,V5) from M[I], so char V2
     RET             ; Return
 
