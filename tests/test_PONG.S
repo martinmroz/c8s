@@ -212,14 +212,14 @@ Pad_Hit:
 
 Draw_Score:
     LD  I,  Score   ; Get address of Score
-    BCD [I], VE     ; Stores in memory BCD representation of VE
-    RESTORE  V2, [I]; Reads V0...V2 in memory, so the score
-    SPRITE I,V1     ; I points to hex char in V1, so the 1st score char
+    LD  B,  VE      ; Stores in memory BCD representation of VE
+    LD  V2, [I]     ; Reads V0...V2 in memory, so the score
+    LD  F,  V1      ; I points to hex char in V1, so the 1st score char
     LD  V4, #14     ; Set V4 to the X coord. to draw 1st score char
     LD  V5, 0       ; Set V5 to the Y coord. to draw 1st score char
     DRW V4, V5, 5   ; Draw 8*5 sprite at (V4,V5) from M[I], so char V1
     ADD V4, #15     ; Set X to the X coord. of 2nd score char
-    SPRITE  I, V2   ; I points to hex char in V2, so 2nd score char
+    LD  F, V2       ; I points to hex char in V2, so 2nd score char
     DRW V4, V5, 5   ; Draw 8*5 sprite at (V4,V5) from M[I], so char V2
     RET             ; Return
 

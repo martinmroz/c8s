@@ -263,19 +263,19 @@ impl<'a> Instruction {
           Some(Opcode::ADD_I_X { register_x: x })
         }
 
-        ("sprite", &InstructionField::IndexRegister, &InstructionField::GeneralPurposeRegister(x)) => {
+        ("ld", &InstructionField::Sprite, &InstructionField::GeneralPurposeRegister(x)) => {
           Some(Opcode::SPRITE_I { register_x: x })
         }
 
-        ("bcd", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        ("ld", &InstructionField::Bcd, &InstructionField::GeneralPurposeRegister(x)) => {
           Some(Opcode::BCD_I { register_x: x })
         }
 
-        ("save", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
+        ("ld", &InstructionField::IndexRegisterIndirect, &InstructionField::GeneralPurposeRegister(x)) => {
           Some(Opcode::SAVE_I { register_x: x })
         }
 
-        ("restore", &InstructionField::GeneralPurposeRegister(x), &InstructionField::IndexRegisterIndirect) => {
+        ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::IndexRegisterIndirect) => {
           Some(Opcode::RESTORE_I { register_x: x })
         }
 
@@ -739,10 +739,10 @@ mod tests {
   fn test_sprite() {
     let empty_map = BTreeMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
-    let index_register_field = InstructionField::IndexRegister;
+    let sprite_field = InstructionField::Sprite;
 
-    // Sprite I, vX.
-    let sprite_i = Instruction::from_mnemonic_and_parameters("sprite", &vec![index_register_field, register_field], &empty_map).unwrap();
+    // ld f, vX.
+    let sprite_i = Instruction::from_mnemonic_and_parameters("ld", &vec![sprite_field, register_field], &empty_map).unwrap();
     assert_eq!(sprite_i.size(), 2);
     assert_eq!(sprite_i.0, Opcode::SPRITE_I { register_x: 7 });
   }
@@ -751,10 +751,10 @@ mod tests {
   fn test_bcd() {
     let empty_map = BTreeMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
-    let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
+    let bcd_field = InstructionField::Bcd;
 
-    // Bcd [i], vX.
-    let bcd_i = Instruction::from_mnemonic_and_parameters("bcd", &vec![index_register_indirect_field, register_field], &empty_map).unwrap();
+    // ld b, vX.
+    let bcd_i = Instruction::from_mnemonic_and_parameters("ld", &vec![bcd_field, register_field], &empty_map).unwrap();
     assert_eq!(bcd_i.size(), 2);
     assert_eq!(bcd_i.0, Opcode::BCD_I { register_x: 7 });
   }
@@ -765,8 +765,8 @@ mod tests {
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
 
-    // Save [i], vX.
-    let save_i = Instruction::from_mnemonic_and_parameters("save", &vec![index_register_indirect_field, register_field], &empty_map).unwrap();
+    // ld [i], vX.
+    let save_i = Instruction::from_mnemonic_and_parameters("ld", &vec![index_register_indirect_field, register_field], &empty_map).unwrap();
     assert_eq!(save_i.size(), 2);
     assert_eq!(save_i.0, Opcode::SAVE_I { register_x: 7 });
   }
@@ -777,8 +777,8 @@ mod tests {
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
 
-    // Restore vX. [i].
-    let restore_i = Instruction::from_mnemonic_and_parameters("restore", &vec![register_field, index_register_indirect_field], &empty_map).unwrap();
+    // ld vX, [i].
+    let restore_i = Instruction::from_mnemonic_and_parameters("ld", &vec![register_field, index_register_indirect_field], &empty_map).unwrap();
     assert_eq!(restore_i.size(), 2);
     assert_eq!(restore_i.0, Opcode::RESTORE_I { register_x: 7 });
   }

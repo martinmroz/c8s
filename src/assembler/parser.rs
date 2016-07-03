@@ -126,7 +126,11 @@ pub enum InstructionField<'a> {
   /// Register-indirect access of memory ("[i]").
   IndexRegisterIndirect,
   /// Any other literal identifier, usually a label.
-  Identifier(&'a str)
+  Identifier(&'a str),
+  /// BCD ("b").
+  Bcd,
+  /// Sprite ("f").
+  Sprite
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -165,7 +169,9 @@ impl<'a> fmt::Display for InstructionField<'a> {
       &InstructionField::KeypadRegister             => write!(f, "register:keypad"),
       &InstructionField::IndexRegister              => write!(f, "register:index"),
       &InstructionField::IndexRegisterIndirect      => write!(f, "register-indirect:[index]"),
-      &InstructionField::Identifier(id)             => write!(f, "identifier:{}", id)
+      &InstructionField::Identifier(id)             => write!(f, "identifier:{}", id),
+      &InstructionField::Bcd                        => write!(f, "bcd"),
+      &InstructionField::Sprite                     => write!(f, "sprite"),
     }
   }
 }
@@ -368,6 +374,8 @@ impl<'a,I> Parser<'a,I> where I: Iterator<Item=Token<'a>> {
             "i" | "I"   => InstructionField::IndexRegister,
           "[i]" | "[I]" => InstructionField::IndexRegisterIndirect,
             "k" | "K"   => InstructionField::KeypadRegister,
+            "b" | "B"   => InstructionField::Bcd,
+            "f" | "F"   => InstructionField::Sprite,
 
           // Now it's a GPR or an Identifier.
           identifier_string @ _ => {
@@ -731,6 +739,10 @@ mod tests {
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::IndexRegisterIndirect]));
     parser = Parser::new(Scanner::new("-", "LABEL\n"));
     assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Identifier("LABEL")]));
+    parser = Parser::new(Scanner::new("-", "b\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Bcd]));
+    parser = Parser::new(Scanner::new("-", "f\n"));
+    assert_eq!(parser.parse_field_list(Vec::new()), Ok(vec![InstructionField::Sprite]));
 
     // A field list can end in a trailing comma.
     parser = Parser::new(Scanner::new("-", "$FF,\n"));

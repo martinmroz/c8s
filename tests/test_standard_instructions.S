@@ -134,18 +134,18 @@ in_reserved_area:
   ADD I, V1               ; F11E
   ADD I, VF               ; FF1E
 
-  SPRITE I, V0            ; F029 or LD F, V0
-  SPRITE I, V1            ; F129 or LD F, V1
-  SPRITE I, VF            ; FF29 or LD F, VF
+  LD F, V0                ; F029
+  LD F, V1                ; F129
+  LD F, VF                ; FF29
 
-  BCD [I], V0             ; F033 or LD B, V0
-  BCD [I], V1             ; F133 or LD B, V0
-  BCD [I], VF             ; FF33 or LD B, V0
+  LD B, V0                ; F033
+  LD B, V1                ; F133
+  LD B, VF                ; FF33
 
-  SAVE [I], V0            ; F055 or LD [I], V0
-  SAVE [I], V1            ; F155 or LD [I], V1
-  SAVE [I], VF            ; FF55 or LD [I], VF
+  LD [I], V0              ; F055
+  LD [I], V1              ; F155
+  LD [I], VF              ; FF55
 
-  RESTORE V0, [I]         ; F065 or LD V0, [I]
-  RESTORE V1, [I]         ; F165 or LD V1, [I]
-  RESTORE VF, [I]         ; FF65 or LD VF, [I]
+  LD V0, [I]              ; F065
+  LD V1, [I]              ; F165
+  LD VF, [I]              ; FF65
