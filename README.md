@@ -50,7 +50,7 @@ The following literal types are supported.
 
 ## Labels
 
-Any identifier followed by a colon (`NAME:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly.
+Any identifier followed by a colon (`NAME:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly. As a two-pass assembler, labels do not need to be defined in advance of being used.
 
 ## Mnemonics
 
