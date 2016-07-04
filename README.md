@@ -4,6 +4,7 @@ c8s
 Chip-8/48 Assembler written in Rust. Written originally to support the `FPC8` FPGA Chip-8 implementation I've been working on in my spare time. It supports the common dialect of Chip-8/48 as defined in the [Cowgod Chip-8 Technical Reference v1.0](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM) in addition to some `FPC8` specific extensions. The output will be compatible with any Chip-8/48 interpreter.
 
 [![Build Status](https://travis-ci.org/martinmroz/c8s.svg?branch=master)](https://travis-ci.org/martinmroz/c8s)
+[![Coverage Status](https://coveralls.io/repos/github/martinmroz/c8s/badge.svg?branch=master)](https://coveralls.io/github/martinmroz/c8s?branch=master)
 
 ## Usage
 
