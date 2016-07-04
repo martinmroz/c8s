@@ -50,59 +50,59 @@ The following literal types are supported.
 
 ## Labels
 
-Any identifier followed by a colon (`LABEL:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly.
+Any identifier followed by a colon (`NAME:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly.
 
 ## Mnemonics
 
 ### Standard Set
 `c8s` supports effectively all standard Chip-8/48 mnemonics (not Super Chip-48). The mnemonic set supported is compatbile with the [Cowgod Chip-8 Technical Reference v1.0](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM). The mnemonics and registers are case-insensitive.
 
-| Opcode | Mnemonic        | Function                                                 |
-| ------ | --------------- | -------------------------------------------------------- |
-| 0nnn   | `SYS addr`      | Jump to a machine code routine at `nnn`. *Unsupported*.  |
-| 00E0   | `CLS`           | Clear the display.                                       |
-| 00EE   | `RET`           | Return from subroutine.                                  |
-| 1nnn   | `JP addr`       | Jump to the address `nnn`.                               |
-| 2nnn   | `CALL addr`     | Call subroutine at address `nnn`.                        |
-| 3xkk   | `SE Vx, nn`     | Skip the next instruction if `Vx == nn`.                 |
-| 4xkk   | `SNE Vx, nn`    | Skip the next instruction if `Vx != nn`.                 |
-| 5xy0   | `SE Vx, Vy`     | Skip the next instruction if `Vx == Vy`.                 |
-| 6xkk   | `LD Vx, nn`     | Set register `Vx` to `nn`.                               |
-| 7xkk   | `ADD Vx, nn`    | Set register `Vx` to `Vx + nn`.                          |
-| 8xy0   | `LD Vx, Vy`     | Set register `Vx` to `Vy`.                               |
-| 8xy1   | `OR Vx, Vy`     | Set register `Vx` to `Vx | Vy`.                          |
-| 8xy2   | `AND Vx, Vy`    | Set register `Vx` to `Vx & Vy`.                          |
-| 8xy3   | `XOR Vx, Vy`    | Set register `Vx` to `Vx ^ Vy`.                          |
-| 8xy4   | `ADD Vx, Vy`    | Set register `Vx` to `Vx & Vy`, and `VF` to `Carry`.     |
-| 8xy5   | `SUB Vx, Vy`    | Set register `Vx` to `Vx - Vy`, and `VF` to `!Borrow`.   |
-| 8xy6   | `SHR Vx`        | Set register `Vx` to `Vx >> 1`.                          |
-| 8xy7   | `SUBN Vx, Vy`   | Set register `Vx` to `Vy - Vx`, and `VF` to `!Borrow`.   |
-| 8xyE   | `SHL Vx`        | Set register `Vx` to `Vx << 1`.                          |
-| 9xy0   | `SNE Vx, Vy`    | Skip the next instruction if `Vx != Vy`.                 |
-| Annn   | `LD I, addr`    | Set register `I` to address `nnn`.                       |
-| Bnnn   | `JP V0, addr`   | Jump to the address `nnn + V0`.                          |
-| Cxkk   | `RND Vx, nn`    | Set register `Vx` to `RAND() & nn`.                      |
-| Dxyn   | `DRW Vx, Vy, n` | Draw `n` byte sprite from address `I` at `(Vx, Vy)`.     |
-| Ex9E   | `SKP Vx`        | Skip next instruction if key value `Vx` is pressed.      |
-| ExA1   | `SKNP Vx`       | Skip next instruction if key value `Vx` is not pressed.  |
-| Fx07   | `LD Vx, DT`     | Set register `Vx` to the value of the delay timer.       |
-| Fx0A   | `LD Vx, K`      | Wait for a key press and store the value in `Vx`.        |
-| Fx15   | `LD DT, Vx`     | Set the delay timer to `Vx`.                             |
-| Fx18   | `LD ST, Vx`     | Set the sound timer to `Vx`.                             |
-| Fx1E   | `ADD I, Vx`     | Set register `I` to `I + Vx`.                            |
-| Fx29   | `LD F, Vx`      | Set register `I` to `SPRITE_ADDRESS_OF(Vx)`.             |
-| Fx33   | `LD B, Vx`      | Store `BCD(Vx)` into `[I ... I+2]`.                      |
-| Fx55   | `LD [I], Vx`    | Store `V0 ... Vx` into `[I ... I+x]`.                    |
-| Fx65   | `LD Vx, [I]`    | Load registers `V0 ... Vx` from `[I ... I+x]`.           |
+| Opcode | Mnemonic        | Function                                                    |
+| ------ | --------------- | ----------------------------------------------------------- |
+| 0nnn   | `SYS addr`      | Jump to a machine code routine at `nnn`. *Unsupported*.     |
+| 00E0   | `CLS`           | Clear the display.                                          |
+| 00EE   | `RET`           | Return from subroutine.                                     |
+| 1nnn   | `JP addr`       | Jump to the address `nnn`.                                  |
+| 2nnn   | `CALL addr`     | Call subroutine at address `nnn`.                           |
+| 3xkk   | `SE Vx, nn`     | Skip the next instruction if `Vx == nn`.                    |
+| 4xkk   | `SNE Vx, nn`    | Skip the next instruction if `Vx != nn`.                    |
+| 5xy0   | `SE Vx, Vy`     | Skip the next instruction if `Vx == Vy`.                    |
+| 6xkk   | `LD Vx, nn`     | Set register `Vx` to `nn`.                                  |
+| 7xkk   | `ADD Vx, nn`    | Set register `Vx` to `Vx + nn`.                             |
+| 8xy0   | `LD Vx, Vy`     | Set register `Vx` to `Vy`.                                  |
+| 8xy1   | `OR Vx, Vy`     | Set register `Vx` to `Vx | Vy`.                             |
+| 8xy2   | `AND Vx, Vy`    | Set register `Vx` to `Vx & Vy`.                             |
+| 8xy3   | `XOR Vx, Vy`    | Set register `Vx` to `Vx ^ Vy`.                             |
+| 8xy4   | `ADD Vx, Vy`    | Set register `Vx` to `Vx & Vy`, and `VF` to `Carry`.        |
+| 8xy5   | `SUB Vx, Vy`    | Set register `Vx` to `Vx - Vy`, and `VF` to `!Borrow`.      |
+| 8xy6   | `SHR Vx`        | Set register `Vx` to `Vx >> 1`, and `VF` to `LSB(Vx)`.      |
+| 8xy7   | `SUBN Vx, Vy`   | Set register `Vx` to `Vy - Vx`, and `VF` to `!Borrow`.      |
+| 8xyE   | `SHL Vx`        | Set register `Vx` to `Vx << 1`, and `VF` to `MSB(Vx)`.      |
+| 9xy0   | `SNE Vx, Vy`    | Skip the next instruction if `Vx != Vy`.                    |
+| Annn   | `LD I, addr`    | Set register `I` to address `nnn`.                          |
+| Bnnn   | `JP V0, addr`   | Jump to the address `nnn + V0`.                             |
+| Cxkk   | `RND Vx, nn`    | Set register `Vx` to `RAND & nn`, and `VF` to `COLLISION`.  |
+| Dxyn   | `DRW Vx, Vy, n` | Draw `n` byte sprite from address `I` at `(Vx, Vy)`.        |
+| Ex9E   | `SKP Vx`        | Skip next instruction if key value `Vx` is pressed.         |
+| ExA1   | `SKNP Vx`       | Skip next instruction if key value `Vx` is not pressed.     |
+| Fx07   | `LD Vx, DT`     | Set register `Vx` to the value of the delay timer.          |
+| Fx0A   | `LD Vx, K`      | Wait for a key press and store the value in `Vx`.           |
+| Fx15   | `LD DT, Vx`     | Set the delay timer to `Vx`.                                |
+| Fx18   | `LD ST, Vx`     | Set the sound timer to `Vx`.                                |
+| Fx1E   | `ADD I, Vx`     | Set register `I` to `I + Vx`.                               |
+| Fx29   | `LD F, Vx`      | Set register `I` to `SPRITE_ADDRESS_OF(Vx)`.                |
+| Fx33   | `LD B, Vx`      | Store `BCD(Vx)` into `[I ... I+2]`.                         |
+| Fx55   | `LD [I], Vx`    | Store `V0 ... Vx` into `[I ... I+x]`.                       |
+| Fx65   | `LD Vx, [I]`    | Load registers `V0 ... Vx` from `[I ... I+x]`.              |
 
 ### Extended Set for FPC8
 
 The `c8s` assembler was written in support of the `FPC8` FPGA Chip-8 implementation. The following instructions are only valid on the `FPC8` and should not be used. No warning is issued.
 
-| Opcode | Mnemonic        | Function                                                 |
-| ------ | --------------- | -------------------------------------------------------- |
-| 00F9   | `TRAPRET`       | Return from a software trap.                             |
-| 00FA   | `TRAP`          | Triggers a non-specific software trap.                   |
+| Opcode | Mnemonic        | Function                                                    |
+| ------ | --------------- | ----------------------------------------------------------- |
+| 00F9   | `TRAPRET`       | Return from a software trap.                                |
+| 00FA   | `TRAP`          | Triggers a non-specific software trap.                      |
 
 ## Cargo Dependencies
 
