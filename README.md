@@ -19,6 +19,23 @@ The default output file name, if not specified, is `a.hex`. If you'd like to out
 The file format of the output is 8-bit Intel HEX [`I8HEX`](https://en.wikipedia.org/wiki/Intel_HEX). This file format is commonly used in embedded systems as it supports multiple disjoint address ranges in addition to checksumming each chunk to improve reliability of transfers.
 
 ## Literals
+The following literal types are supported.
+
+* 4-bit numeric.
+	* Valid in the context of a mnemonic or within directives.
+	* Decimal `0...15`
+	* Hexadecimal `$0-$F` and `#0-#F` (case-insensitive).
+* 8-bit numeric.
+	* Valid in the context of a mnemonic or within directives.
+	* Decimal `0...255`
+	* Hexadecimal `$0-$FF` and `#0-#FF` (case-insensitive).
+* 12-bit numeric.
+	* Valid in the context of a mnemonic only, not within directives.
+	* Decimal `0...4095`
+	* Hexadecimal `$0-$FFF` and `#0-#FFF` (case-insensitive).
+* String.
+	* Valid only in the context of `.DB`.
+	* NOT null-terminated.
 
 ## Directives
 `c8s` supports the following directives, the mnemonics for which are not case sensitive.
