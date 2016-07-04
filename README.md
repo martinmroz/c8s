@@ -34,7 +34,7 @@ The following literal types are supported.
 	* Decimal `0...4095`
 	* Hexadecimal `$0-$FFF` and `#0-#FFF` (case-insensitive).
 * String.
-	* Valid only in the context of `.DB`.
+	* Valid only in the context of `.DB` directive.
 	* NOT null-terminated.
 
 ## Directives
