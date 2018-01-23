@@ -89,6 +89,20 @@ impl DataRange {
 
 }
 
+// MARK: - Ordering
+
+impl Ord for DataRange {
+  fn cmp(&self, other: &DataRange) -> cmp::Ordering {
+    self.start_address.cmp(&other.start_address)
+  }
+}
+
+impl PartialOrd for DataRange {
+  fn partial_cmp(&self, other: &DataRange) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
 // MARK: - Public Functions
 
 /// Returns a list of pairs of overlapping ranges in `ranges`.
@@ -124,7 +138,6 @@ mod tests {
   use super::*;
 
   use twelve_bit::u12;
-  use twelve_bit::u12::*;
 
   #[test]
   fn test_empty_ranges() {
@@ -276,7 +289,7 @@ mod tests {
     assert_eq!(find_overlapping_ranges(&[range_a(), range_b()]), vec![(&range_a(), &range_b())]);
     assert_eq!(find_overlapping_ranges(&[range_a(), range_c()]), vec![(&range_a(), &range_c())]);
 
-    // // One overlapping range when the zero-range is also included.
+    // One overlapping range when the zero-range is also included.
     assert_eq!(find_overlapping_ranges(&[range_a(), range_b(), range_e()]), vec![(&range_a(), &range_b())]);
 
     // Test all ranges to find the overlapping pairs.

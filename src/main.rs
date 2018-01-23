@@ -24,14 +24,24 @@ use getopts::Options;
 
 pub mod assembler;
 use assembler::assembler::*;
+use assembler::bin_writer;
 use assembler::data_range;
 use assembler::ihex_writer;
 use assembler::parser::*;
 use assembler::scanner::Scanner;
 
+#[derive(Copy,Clone,Debug,Hash,Eq,PartialEq)]
+enum OutputFormat {
+  /// Write results as Intel IHEX format.
+  IntelHex,
+  /// Write results as a flat binary image file, without a header.
+  /// Any space between regions is padded using zero bytes.
+  Binary
+}
+
 // MARK: - Assembler
 
-fn assemble_file<F>(input_path: &str, output_path: &str, log_program_error: F) where F : Fn(&str) -> () {
+fn assemble_file<F>(input_path: &str, output_path: &str, output_format: OutputFormat, log_program_error: F) where F : Fn(&str) -> () {
 
   // Open the input file (read-only).
   let mut input_file = File::open(input_path).unwrap_or_else(|reason| {
@@ -80,7 +90,12 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_program_error: F) w
   }
 
   // Convert the data ranges to Intel I8HEX format.
-  let result = ihex_writer::ihex_representation_of_data_ranges(&data_ranges);
+  let result = match output_format {
+    OutputFormat::IntelHex =>
+      ihex_writer::ihex_representation_of_data_ranges(&data_ranges).into_bytes(),
+    OutputFormat::Binary =>
+      bin_writer::bin_representation_of_data_ranges(&data_ranges),
+  };
 
   // Open the output file for writing (truncate) or use stdout if the specified path is `-`.
   let mut output_file: Box<io::Write> = match output_path {
@@ -97,7 +112,7 @@ fn assemble_file<F>(input_path: &str, output_path: &str, log_program_error: F) w
   };
 
   // Write the result to the output file.
-  output_file.write_all(result.as_bytes()).unwrap_or_else(|reason| {
+  output_file.write_all(&result).unwrap_or_else(|reason| {
     log_program_error(&format!("Unable to write result to output file '{}'", output_path));
     log_program_error(&reason.to_string());
     process::exit(1);
@@ -129,6 +144,7 @@ fn main() {
 
   let mut options = Options::new();
   options.optopt ("o", "output",  "Write output to <file>", "<file>");
+  options.optopt ("x", "format",  "Output either 'ihex' (default) or 'bin'", "<fmt>");
   options.optflag("h", "help",    "Display available options");
   options.optflag("v", "version", "Display version information");
 
@@ -151,7 +167,21 @@ fn main() {
   }
 
   // Extract the output file name, and default to 'a.hex' if not specified.
-  let output_path = &matches.opt_str("o").unwrap_or(String::from("a.hex"));
+  let output_path = &matches.opt_str("o").unwrap_or(String::from("a.out"));
+
+  // Extract the output format type, and default to IntelHex if not specified.
+  let output_format = match matches.opt_str("x") {
+    None =>
+      OutputFormat::IntelHex,
+    Some(ref value) if value == "ihex" => 
+      OutputFormat::IntelHex,
+    Some(ref value) if value == "bin" =>
+      OutputFormat::Binary,
+    _ => {
+      print_usage(&program, options);
+      process::exit(1);
+    }
+  };
 
   // Allow one single input file name parameter.
   let input_path = match matches.free.len() {
@@ -163,7 +193,7 @@ fn main() {
   };
 
   // Execute the assembler, in the event of failure, log an error and exit.
-  assemble_file(input_path, output_path, |reason| {
+  assemble_file(input_path, output_path, output_format, |reason| {
     println!("{}: error: {}", program, reason);
   });
 }
