@@ -269,6 +269,12 @@ impl<'a> Instruction {
           Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(value)) })
         }
 
+        // The mnemonic 'rnd Vx,NN' can take a label parameter.
+        ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::Identifier(label)) => {
+          let label_value = try!(resolve_label_with_map(label, label_map));
+          Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(label_value)) })
+        }
+
         ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::DelayTimer) => {
           Some(Opcode::LD_X_DT { register_x: x })
         }
@@ -837,6 +843,48 @@ mod tests {
     let invalid_rnd_imm = Instruction::from_mnemonic_and_parameters("rnd", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_rnd_imm.is_err(), true);
     assert_eq!(invalid_rnd_imm.unwrap_err(), Error::ExpectingEightBitValue(0x100));
+  }
+
+  #[test]
+  fn test_rnd_immediate_label() {
+    let mut label_map = HashMap::new();
+    label_map.insert("TWELVE_BITS", u12::MAX);
+    label_map.insert("EIGHT_BITS", u12![255]);
+    label_map.insert("FOUR_BITS", u12![15]);
+
+    // Random with 8-bit immediate label.
+    let rnd_label8 = Instruction::from_mnemonic_and_parameters("rnd", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::Identifier("EIGHT_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(rnd_label8.size(), 2);
+    assert_eq!(rnd_label8.0, Opcode::RND { register_x: 1, mask: 0xFF });
+
+    // Random with 4-bit immediate label.
+    let rnd_label4 = Instruction::from_mnemonic_and_parameters("rnd", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("FOUR_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(rnd_label4.size(), 2);
+    assert_eq!(rnd_label4.0, Opcode::RND { register_x: 2, mask: 0x0F });
+
+    // Load the constant value LABEL:nn into Vx with invalid 12-bit parameter.
+    let rnd_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("rnd", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("TWELVE_BITS")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(rnd_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
+
+    // Load the constant value LABEL:nn into Vx with invalid label name.
+    let rnd_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("rnd", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("INVALID")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(rnd_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
