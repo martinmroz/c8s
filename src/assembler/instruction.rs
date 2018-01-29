@@ -31,8 +31,8 @@ impl error::Error for Error {
   fn description(&self) -> &str {
     match self {
       &Error::UnableToResolveLabel(_)           => "Unable to resolve label",
-      &Error::ExpectingEightBitValue(_)         => "Found 12-bit numeric literal, expecting 8-bit value",
-      &Error::ExpectingFourBitValue(_)          => "Found 8/12-bit numeric literal, expecting 4-bit value",
+      &Error::ExpectingEightBitValue(_)         => "Found 12-bit numeric value, expecting 8-bit value",
+      &Error::ExpectingFourBitValue(_)          => "Found 8/12-bit numeric value, expecting 4-bit value",
       &Error::NoMatchingFormat(_,_)             => "No matching instruction",
     }
   }
@@ -46,9 +46,9 @@ impl fmt::Display for Error {
       &Error::UnableToResolveLabel(ref name) => 
         write!(f, "Unable to resolve label {}.", name),
       &Error::ExpectingEightBitValue(actual) =>
-        write!(f, "Found 12-bit numeric literal ${:X}, expecting 8-bit value.", actual),
+        write!(f, "Found 12-bit numeric value ${:X}, expecting 8-bit value.", actual),
       &Error::ExpectingFourBitValue(actual) =>
-        write!(f, "Found 8/12-bit numeric literal ${:X}, expecting 4-bit value.", actual),
+        write!(f, "Found 8/12-bit numeric value ${:X}, expecting 4-bit value.", actual),
       &Error::NoMatchingFormat(ref mnemonic, Some(ref fields)) =>
         write!(f, "No matching instruction: {} {}.", mnemonic, fields),
       &Error::NoMatchingFormat(ref mnemonic, None) =>
@@ -366,9 +366,9 @@ mod tests {
     assert_eq!(format!("{}", Error::UnableToResolveLabel(String::from("TEST_LABEL"))),
       "Unable to resolve label TEST_LABEL.");
     assert_eq!(format!("{}", Error::ExpectingEightBitValue(0x100)),
-      "Found 12-bit numeric literal $100, expecting 8-bit value.");
+      "Found 12-bit numeric value $100, expecting 8-bit value.");
     assert_eq!(format!("{}", Error::ExpectingFourBitValue(0x10)),
-      "Found 8/12-bit numeric literal $10, expecting 4-bit value.");
+      "Found 8/12-bit numeric value $10, expecting 4-bit value.");
     assert_eq!(format!("{}", Error::NoMatchingFormat(String::from("jp"), Some(String::from("register:0")))),
       "No matching instruction: jp register:0.");
     assert_eq!(format!("{}", Error::NoMatchingFormat(String::from("jp"), None)),
