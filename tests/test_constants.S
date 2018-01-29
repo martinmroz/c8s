@@ -12,3 +12,9 @@ test:
   sne   v0, 15
   ld    v0, CONST_08B
   ld    v0, 255
+  add   v0, CONST_04B
+  add   v0, 15
+  rnd   v0, CONST_08B
+  rnd   v0, 255
+  drw   v0, v1, CONST_04B
+  drw   v0, v1, 15

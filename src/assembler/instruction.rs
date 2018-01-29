@@ -217,6 +217,12 @@ impl<'a> Instruction {
           Some(Opcode::ADD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
         }
 
+        // The 'add Vx,NN' mnemonic may reference a label.
+        ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::Identifier(label)) => {
+          let label_value = try!(resolve_label_with_map(label, label_map));
+          Some(Opcode::ADD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(label_value)) })
+        }
+
         ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::GeneralPurposeRegister(y)) => {
           Some(Opcode::LD_REGISTER { register_x: x, register_y: y })
         }
@@ -249,7 +255,7 @@ impl<'a> Instruction {
           Some(Opcode::LD_I { value: value })
         }
 
-        // The mnemonic 'ld i' can take a label parameter.
+        // The 'ld I,NNN' mnemonic may reference a label.
         ("ld", &InstructionField::IndexRegister, &InstructionField::Identifier(label)) => {
           let address = try!(resolve_label_with_map(label, label_map));
           Some(Opcode::LD_I { value: address })
@@ -259,7 +265,7 @@ impl<'a> Instruction {
           Some(Opcode::JP_V0 { value: value })
         }
 
-        // The mnemonic 'jp v0' can take a label parameter.
+        // The 'jp V0,NNN' mnemonic may reference a label.
         ("jp", &InstructionField::GeneralPurposeRegister(0), &InstructionField::Identifier(label)) => {
           let address = try!(resolve_label_with_map(label, label_map));
           Some(Opcode::JP_V0 { value: address })
@@ -269,7 +275,7 @@ impl<'a> Instruction {
           Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(value)) })
         }
 
-        // The mnemonic 'rnd Vx,NN' can take a label parameter.
+        // The 'rnd Vx,NN' mnemonic may reference a label.
         ("rnd", &InstructionField::GeneralPurposeRegister(x), &InstructionField::Identifier(label)) => {
           let label_value = try!(resolve_label_with_map(label, label_map));
           Some(Opcode::RND { register_x: x, mask: try!(numeric_literal_to_8_bit_field(label_value)) })
@@ -326,7 +332,7 @@ impl<'a> Instruction {
         opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_4_bit_field(value)) } );
       }
 
-      // 4-bit immediate may be specified in a label.
+      // The 'drw Vx,Vy,N' mnemonic may reference a label.
       if let (
         "drw",
         &InstructionField::GeneralPurposeRegister(x),
@@ -793,6 +799,48 @@ mod tests {
     let add_i = Instruction::from_mnemonic_and_parameters("add", &vec![index_register_field, register_field_2], &empty_map).unwrap();
     assert_eq!(add_i.size(), 2);
     assert_eq!(add_i.0, Opcode::ADD_I_X { register_x: 2 });
+  }
+
+  #[test]
+  fn test_add_immediate_label() {
+    let mut label_map = HashMap::new();
+    label_map.insert("TWELVE_BITS", u12::MAX);
+    label_map.insert("EIGHT_BITS", u12![255]);
+    label_map.insert("FOUR_BITS", u12![15]);
+
+    // Add the 8-bit constant to a register.
+    let add_label8 = Instruction::from_mnemonic_and_parameters("add", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::Identifier("EIGHT_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(add_label8.size(), 2);
+    assert_eq!(add_label8.0, Opcode::ADD_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Add the 4-bit constant to a register.
+    let add_label4 = Instruction::from_mnemonic_and_parameters("add", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("FOUR_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(add_label4.size(), 2);
+    assert_eq!(add_label4.0, Opcode::ADD_IMMEDIATE { register_x: 2, value: 0x0F });
+
+    // Add the (invalid) 12-bit constant to a register.
+    let add_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("add", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("TWELVE_BITS")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(add_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
+
+    // Attempt to reference an invalid label name.
+    let add_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("add", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("INVALID")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(add_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
