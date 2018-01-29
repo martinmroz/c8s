@@ -383,6 +383,16 @@ mod tests {
   }
 
   #[test]
+  fn test_define_labels_does_semantic_analysis_on_equ() {
+    let program = vec![
+      make_directive_node(1, "equ", vec![])
+    ];
+
+    let result = define_labels(&program);
+    assert_eq!(format!("{}", result.unwrap_err()), "-:1:2-4: error: Incorrect number of parameters (0) for directive .equ, expecting 1.");
+  }
+
+  #[test]
   fn test_define_labels_fails_on_redefinition() {
     let program = vec![
       make_label_node(1, "L1"),
