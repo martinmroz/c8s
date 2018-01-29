@@ -43,7 +43,9 @@ pub enum SemanticError<'a> {
   /// The label specified has already been defined.
   RedefinitionOfLabel(SourceFileLocation<'a>, String),
   /// Unable to assemble the specified instruction.
-  AssemblyFailed(SourceFileLocation<'a>, instruction::Error)
+  AssemblyFailed(SourceFileLocation<'a>, instruction::Error),
+  /// A constant definition must immediately follow a label definition.
+  ConstantWithoutLabel(SourceFileLocation<'a>),
 }
 
 impl<'a> error::Error for SemanticError<'a> {
@@ -59,6 +61,7 @@ impl<'a> error::Error for SemanticError<'a> {
       &SemanticError::InstructionWouldOverlow(_)  => "Instruction would cause address counter to overflow $FFF",
       &SemanticError::RedefinitionOfLabel(_,_)    => "Attempted re-definition of label",
       &SemanticError::AssemblyFailed(_,_)         => "Unable to assemble instruction",
+      &SemanticError::ConstantWithoutLabel(_)     => "A constant must be defined immediately following a label name",
     }
   }
 
@@ -90,9 +93,11 @@ impl<'a> fmt::Display for SemanticError<'a> {
       &SemanticError::RedefinitionOfLabel(ref loc, ref label) =>
         write!(f, "{}: error: Attempted re-definition of label '{}'.", loc, label),
       &SemanticError::InstructionWouldOverlow(ref loc) =>
-        write!(f, "{}: error: {}", loc, (self as &error::Error).description()),
+        write!(f, "{}: error: {}.", loc, (self as &error::Error).description()),
       &SemanticError::AssemblyFailed(ref loc, ref reason) =>
         write!(f, "{}: error: {}", loc, reason),
+      &SemanticError::ConstantWithoutLabel(ref loc) =>
+        write!(f, "{}: error: {}.", loc, (self as &error::Error).description()),
     }
   }
 }
@@ -111,8 +116,10 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
   let mut label_address_map = BTreeMap::new();
   let mut current_address = u12![0];
 
-  // Define all labels and process '.org' directives.
-  for node in syntax_list.iter() {
+  // Label definition seeks forward to see if it is a constant definition.
+  let mut list_walker = syntax_list.iter().peekable();
+
+  while let Some(node) = list_walker.next() {
     match *node {
       Node::Directive(ref data) => {
         // Validate the directive and that the arguments match the identifier.
@@ -138,18 +145,36 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
             .ok_or(SemanticError::DirectiveWouldOverflow(data.location.clone(), directive.clone()))
         );
 
-        // The origin directive changes the current address.
-        if let Directive::Org(address) = directive {
-          current_address = address;
+        match directive {
+          Directive::Org(address) =>
+            // The origin directive changes the current address.
+            current_address = address,
+          Directive::Db(_) =>
+            // Defining bytes is already taken into account in the current address update.
+            (),
+          Directive::Equ(_) =>
+            // Constant definition must take place in the context of label definition.
+            return Err(SemanticError::ConstantWithoutLabel(data.location.clone())),
         }
       }
 
       Node::Label(ref data) => {
-        // Map the label to the current address and remove from the ASL.
+        let mut label_value = current_address;
+
+        // If the semantic node immediately following is a valid constant definition, eat it and take the value.
+        if let Some(&&Node::Directive(ref data)) = list_walker.peek() {
+          let directive = Directive::from_identifier_and_parameters(data.identifier, &data.arguments).ok();
+          if let Some(Directive::Equ(constant)) = directive {
+            label_value = constant;
+            list_walker.next();
+          }
+        }
+
+        // Assign the value into the label map.
         if label_address_map.contains_key(&data.identifier) {
           return Err(SemanticError::RedefinitionOfLabel(data.location.clone(), String::from(data.identifier)));
         } else {
-          label_address_map.insert(data.identifier, current_address);
+          label_address_map.insert(data.identifier, label_value);
         }
       }
 

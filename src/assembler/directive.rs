@@ -64,14 +64,17 @@ pub enum Directive {
   /// Directive to set the emit origin to the new address.
   Org(U12),
   /// Directive to emit the specified bytes.
-  Db(Vec<u8>)
+  Db(Vec<u8>),
+  /// Directive to define a label as a constant instead of an address.
+  Equ(U12),
 }
 
 impl fmt::Display for Directive {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       &Directive::Org(location) => write!(f, ".{} ${:3X}",     names::ORG, usize::from(location)),
-      &Directive::Db(ref bytes) => write!(f, ".{} [{} bytes]", names::DB,  bytes.len())
+      &Directive::Db(ref bytes) => write!(f, ".{} [{} bytes]", names::DB,  bytes.len()),
+      &Directive::Equ(value)    => write!(f, ".{} ${:3X}",     names::EQU, usize::from(value)),
     }
   }
 }
@@ -80,7 +83,9 @@ mod names {
   /// The name of the 'origin' directive (.org)
   pub const ORG: &'static str = "org";
   /// The name of the 'define-bytes' directive (.db)
-  pub const DB : &'static str = "db" ;
+  pub const DB: &'static str = "db";
+  /// The name of the 'assign-constant' directive (.equ)
+  pub const EQU: &'static str = "equ";
 }
 
 impl<'a> Directive {
@@ -145,6 +150,25 @@ impl<'a> Directive {
       return Ok(Directive::Db(bytes));
     }
 
+    /*
+     The 'equ' directive is used to set the current label to a value other than the current address.
+     The directive requires a single numeric literal in the range $000-$FFF.
+     */
+    if identifier == names::EQU {
+      if arguments.len() != 1 {
+        return Err(Error::IncorrectNumberOfParameters(names::EQU, arguments.len(), 1, false));
+      }
+
+      return match arguments[0] {
+        Literal::Numeric(a) if a <= 0xFFF => {
+          Ok(Directive::Equ(a.unchecked_into()))
+        }
+        _ => {
+          Err(Error::DirectiveRequiresOneNumericLiteral(names::EQU))
+        }
+      }
+    }
+
     Err(Error::UnrecognizedDirective(String::from(input_identifier)))
   }
 
@@ -154,7 +178,8 @@ impl<'a> Directive {
   pub fn size(&self) -> usize {
     match *self {
       Directive::Org(_)       => 0,
-      Directive::Db(ref data) => data.len()
+      Directive::Db(ref data) => data.len(),
+      Directive::Equ(_)       => 0,
     }
   }
 
@@ -165,7 +190,8 @@ impl<'a> Directive {
   pub fn into_vec(self) -> Vec<u8> {
     match self {
       Directive::Org(_)       => Vec::new(),
-      Directive::Db(data)     => data
+      Directive::Db(data)     => data,
+      Directive::Equ(_)       => Vec::new(),
     }
   }
 
@@ -193,6 +219,8 @@ mod tests {
       "Incorrect number of parameters (0) for directive .org, expecting 1 or more.");
     assert_eq!(format!("{}", Error::DirectiveRequiresOneNumericLiteral(names::DB)), 
       "Directive .db requires 1 numeric literal in the range $000-$FFF.");
+    assert_eq!(format!("{}", Error::DirectiveRequiresOneNumericLiteral(names::EQU)), 
+      "Directive .equ requires 1 numeric literal in the range $000-$FFF.");
     assert_eq!(format!("{}", Error::AllNumericParametersMustBeByteLiterals(names::ORG, 0x100)),
       "All numeric parameters to .org must be 1-byte literals ($100 > $FF).");
     assert_eq!(format!("{}", Error::UnrecognizedDirective(String::from("dw"))), 
@@ -232,6 +260,22 @@ mod tests {
   }
 
   #[test]
+  fn test_validate_directive_semantics_for_equ() {
+    let mut params = vec![];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Err(Error::IncorrectNumberOfParameters(names::EQU, 0, 1, false)));
+    params = vec![Literal::Numeric(1), Literal::Numeric(3)];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Err(Error::IncorrectNumberOfParameters(names::EQU, 2, 1, false)));
+    params = vec![Literal::Numeric(0x1000)];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Err(Error::DirectiveRequiresOneNumericLiteral(names::EQU)));
+    params = vec![Literal::String("TEST_STRING")];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Err(Error::DirectiveRequiresOneNumericLiteral(names::EQU)));
+    params = vec![Literal::Numeric(0xFFF)];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Ok(Directive::Equ(u12::MAX)));
+    params = vec![Literal::Numeric(0x000)];
+    assert_eq!(Directive::from_identifier_and_parameters("equ", &params), Ok(Directive::Equ(u12::MIN)));
+  }
+
+  #[test]
   fn test_validate_directive_semantics_for_invalid_directive() {
     let mut params = vec![];
     assert_eq!(Directive::from_identifier_and_parameters("dw", &params), Err(Error::UnrecognizedDirective(String::from("dw"))));
@@ -257,6 +301,12 @@ mod tests {
     for &(expected_size, size) in test_cases.iter() {
       assert_eq!(size, expected_size);
     }
+  }
+
+  #[test]
+  fn test_size_of_directive_for_equ() {
+    let equ_directive = Directive::from_identifier_and_parameters("equ", &vec![Literal::Numeric(0xFFF)]).ok().unwrap();
+    assert_eq!(equ_directive.size(), 0);
   }
 
 }
