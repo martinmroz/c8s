@@ -207,6 +207,12 @@ impl<'a> Instruction {
           Some(Opcode::LD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
         }
 
+        // The 'ld Vx,NN' mnemonic may reference a label.
+        ("ld", &InstructionField::GeneralPurposeRegister(x), &InstructionField::Identifier(label)) => {
+          let label_value = try!(resolve_label_with_map(label, label_map));
+          Some(Opcode::LD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(label_value)) })
+        }
+
         ("add", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
           Some(Opcode::ADD_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
         }
@@ -618,25 +624,25 @@ mod tests {
     label_map.insert("FOUR_BITS", u12![15]);
 
     // Skip next if Vx != LABEL:nn with valid 8-bit parameter.
-    let sne_label8 = Instruction::from_mnemonic_and_parameters("se", &vec![
+    let sne_label8 = Instruction::from_mnemonic_and_parameters("sne", &vec![
       InstructionField::GeneralPurposeRegister(1),
       InstructionField::Identifier("EIGHT_BITS")],
       &label_map
     ).unwrap();
     assert_eq!(sne_label8.size(), 2);
-    assert_eq!(sne_label8.0, Opcode::SE_IMMEDIATE { register_x: 1, value: 0xFF });
+    assert_eq!(sne_label8.0, Opcode::SNE_IMMEDIATE { register_x: 1, value: 0xFF });
 
     // Skip next if Vx != LABEL:nn with valid 4-bit parameter.
-    let sne_label4 = Instruction::from_mnemonic_and_parameters("se", &vec![
+    let sne_label4 = Instruction::from_mnemonic_and_parameters("sne", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("FOUR_BITS")],
       &label_map
     ).unwrap();
     assert_eq!(sne_label4.size(), 2);
-    assert_eq!(sne_label4.0, Opcode::SE_IMMEDIATE { register_x: 2, value: 0x0F });
+    assert_eq!(sne_label4.0, Opcode::SNE_IMMEDIATE { register_x: 2, value: 0x0F });
 
     // Skip next if Vx != LABEL:nn with invalid 12-bit parameter.
-    let sne_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("se", &vec![
+    let sne_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("sne", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("TWELVE_BITS")],
       &label_map
@@ -644,7 +650,7 @@ mod tests {
     assert_eq!(sne_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
 
     // Skip next if Vx != LABEL:nn with invalid label name.
-    let sne_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("se", &vec![
+    let sne_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("sne", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
@@ -674,6 +680,48 @@ mod tests {
     let invalid_ld_imm = Instruction::from_mnemonic_and_parameters("ld", &vec![register_field_1, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_ld_imm.is_err(), true);
     assert_eq!(invalid_ld_imm.unwrap_err(), Error::ExpectingEightBitValue(0x100));
+  }
+
+  #[test]
+  fn test_ld_immediate_label() {
+    let mut label_map = HashMap::new();
+    label_map.insert("TWELVE_BITS", u12::MAX);
+    label_map.insert("EIGHT_BITS", u12![255]);
+    label_map.insert("FOUR_BITS", u12![15]);
+
+    // Load the constant value LABEL:nn into Vx with valid 8-bit parameter.
+    let ld_label8 = Instruction::from_mnemonic_and_parameters("ld", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::Identifier("EIGHT_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(ld_label8.size(), 2);
+    assert_eq!(ld_label8.0, Opcode::LD_IMMEDIATE { register_x: 1, value: 0xFF });
+
+    // Load the constant value LABEL:nn into Vx with valid 4-bit parameter.
+    let ld_label4 = Instruction::from_mnemonic_and_parameters("ld", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("FOUR_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(ld_label4.size(), 2);
+    assert_eq!(ld_label4.0, Opcode::LD_IMMEDIATE { register_x: 2, value: 0x0F });
+
+    // Load the constant value LABEL:nn into Vx with invalid 12-bit parameter.
+    let ld_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("ld", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("TWELVE_BITS")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(ld_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
+
+    // Load the constant value LABEL:nn into Vx with invalid label name.
+    let ld_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("ld", &vec![
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("INVALID")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(ld_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
