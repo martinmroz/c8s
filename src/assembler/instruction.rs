@@ -325,6 +325,16 @@ impl<'a> Instruction {
         &InstructionField::NumericLiteral(value)) = tuple {
         opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_4_bit_field(value)) } );
       }
+
+      // 4-bit immediate may be specified in a label.
+      if let (
+        "drw",
+        &InstructionField::GeneralPurposeRegister(x),
+        &InstructionField::GeneralPurposeRegister(y),
+        &InstructionField::Identifier(label)) = tuple {
+        let label_value = try!(resolve_label_with_map(label, label_map));
+        opcode = Some(Opcode::DRW {register_x: x, register_y: y, bytes: try!(numeric_literal_to_4_bit_field(label_value)) } );
+      }
     }
 
     opcode
@@ -904,6 +914,51 @@ mod tests {
     let invalid_drw = Instruction::from_mnemonic_and_parameters("drw", &vec![register_field_1, register_field_2, immediate_field_invalid], &empty_map);
     assert_eq!(invalid_drw.is_err(), true);
     assert_eq!(invalid_drw.unwrap_err(), Error::ExpectingFourBitValue(0x10));
+  }
+
+  #[test]
+  fn test_drw_immediate_label() {
+    let mut label_map = HashMap::new();
+    label_map.insert("TWELVE_BITS", u12::MAX);
+    label_map.insert("EIGHT_BITS", u12![255]);
+    label_map.insert("FOUR_BITS", u12![15]);
+
+    // Draw sprite with valid 4-bit parameter number of bytes.
+    let drw_label4 = Instruction::from_mnemonic_and_parameters("drw", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("FOUR_BITS")],
+      &label_map
+    ).unwrap();
+    assert_eq!(drw_label4.size(), 2);
+    assert_eq!(drw_label4.0, Opcode::DRW { register_x: 1, register_y: 2, bytes: 15 });
+
+    // Draw sprite with invalid 8-bit parameter number of bytes.
+    let drw_invalid_12_bit_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("TWELVE_BITS")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(drw_invalid_12_bit_value_error, Error::ExpectingFourBitValue(0xFFF));
+
+    // Draw sprite with invalid 8-bit parameter number of bytes.
+    let drw_invalid_8_bit_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("EIGHT_BITS")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(drw_invalid_8_bit_value_error, Error::ExpectingFourBitValue(0xFF));
+
+    // Draw sprite with invalid label name.
+    let drw_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+      InstructionField::GeneralPurposeRegister(1),
+      InstructionField::GeneralPurposeRegister(2),
+      InstructionField::Identifier("INVALID")],
+      &label_map
+    ).unwrap_err();
+    assert_eq!(drw_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
