@@ -18,7 +18,7 @@ use assembler::parser::InstructionField;
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Error {
-  UnableToResolveAddressOfLabel(String),
+  UnableToResolveLabel(String),
   ExpectingEightBitValue(usize),
   ExpectingFourBitValue(usize),
   NoMatchingFormat(String, Option<String>)
@@ -30,7 +30,7 @@ impl error::Error for Error {
   /// use the `fmt::Display` attribute.
   fn description(&self) -> &str {
     match self {
-      &Error::UnableToResolveAddressOfLabel(_)  => "Unable to resolve address of label",
+      &Error::UnableToResolveLabel(_)           => "Unable to resolve label",
       &Error::ExpectingEightBitValue(_)         => "Found 12-bit numeric literal, expecting 8-bit value",
       &Error::ExpectingFourBitValue(_)          => "Found 8/12-bit numeric literal, expecting 4-bit value",
       &Error::NoMatchingFormat(_,_)             => "No matching instruction",
@@ -43,8 +43,8 @@ impl fmt::Display for Error {
   /// relating to this particular error instance where applicable.
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      &Error::UnableToResolveAddressOfLabel(ref name) => 
-        write!(f, "Unable to resolve address of label {}.", name),
+      &Error::UnableToResolveLabel(ref name) => 
+        write!(f, "Unable to resolve label {}.", name),
       &Error::ExpectingEightBitValue(actual) =>
         write!(f, "Found 12-bit numeric literal ${:X}, expecting 8-bit value.", actual),
       &Error::ExpectingFourBitValue(actual) =>
@@ -70,7 +70,7 @@ fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, U12>
   label_map
     .get(label)
     .map(|value| *value)
-    .ok_or(Error::UnableToResolveAddressOfLabel(String::from(label)))
+    .ok_or(Error::UnableToResolveLabel(String::from(label)))
 }
 
 /**
@@ -357,8 +357,8 @@ mod tests {
 
   #[test]
   fn test_error_display() {
-    assert_eq!(format!("{}", Error::UnableToResolveAddressOfLabel(String::from("TEST_LABEL"))),
-      "Unable to resolve address of label TEST_LABEL.");
+    assert_eq!(format!("{}", Error::UnableToResolveLabel(String::from("TEST_LABEL"))),
+      "Unable to resolve label TEST_LABEL.");
     assert_eq!(format!("{}", Error::ExpectingEightBitValue(0x100)),
       "Found 12-bit numeric literal $100, expecting 8-bit value.");
     assert_eq!(format!("{}", Error::ExpectingFourBitValue(0x10)),
@@ -424,7 +424,7 @@ mod tests {
     let label_field = InstructionField::Identifier("TEST_LABEL");
     let invalid_jp_nl = Instruction::from_mnemonic_and_parameters("jp", &vec![label_field.clone()], &empty_map);
     assert_eq!(invalid_jp_nl.is_err(), true);
-    assert_eq!(invalid_jp_nl.unwrap_err(), Error::UnableToResolveAddressOfLabel(String::from("TEST_LABEL")));
+    assert_eq!(invalid_jp_nl.unwrap_err(), Error::UnableToResolveLabel(String::from("TEST_LABEL")));
 
     // Success 1: Literal 12-bit Numeric.
     let literal_field = InstructionField::NumericLiteral(u12::MAX);
@@ -455,7 +455,7 @@ mod tests {
     let label_field = InstructionField::Identifier("TEST_LABEL");
     let invalid_jp_v0_nl = Instruction::from_mnemonic_and_parameters("jp", &vec![v0_field.clone(), label_field.clone()], &empty_map);
     assert_eq!(invalid_jp_v0_nl.is_err(), true);
-    assert_eq!(invalid_jp_v0_nl.unwrap_err(), Error::UnableToResolveAddressOfLabel(String::from("TEST_LABEL")));
+    assert_eq!(invalid_jp_v0_nl.unwrap_err(), Error::UnableToResolveLabel(String::from("TEST_LABEL")));
 
     // Success 1: Literal 12-bit Numeric.
     let literal_field = InstructionField::NumericLiteral(u12::MAX);
@@ -484,7 +484,7 @@ mod tests {
     let label_field = InstructionField::Identifier("TEST_LABEL");
     let invalid_call_nl = Instruction::from_mnemonic_and_parameters("call", &vec![label_field.clone()], &empty_map);
     assert_eq!(invalid_call_nl.is_err(), true);
-    assert_eq!(invalid_call_nl.unwrap_err(), Error::UnableToResolveAddressOfLabel(String::from("TEST_LABEL")));
+    assert_eq!(invalid_call_nl.unwrap_err(), Error::UnableToResolveLabel(String::from("TEST_LABEL")));
 
     // Success 1: Literal 12-bit Numeric.
     let literal_field = InstructionField::NumericLiteral(u12::MAX);
@@ -591,7 +591,7 @@ mod tests {
     let label_field = InstructionField::Identifier("TEST_LABEL");
     let invalid_ld_i = Instruction::from_mnemonic_and_parameters("ld", &vec![index_register_field.clone(), label_field.clone()], &empty_map);
     assert_eq!(invalid_ld_i.is_err(), true);
-    assert_eq!(invalid_ld_i.unwrap_err(), Error::UnableToResolveAddressOfLabel(String::from("TEST_LABEL")));
+    assert_eq!(invalid_ld_i.unwrap_err(), Error::UnableToResolveLabel(String::from("TEST_LABEL")));
 
     // Success 1: Literal 12-bit Numeric.
     let literal_field = InstructionField::NumericLiteral(u12::MAX);
