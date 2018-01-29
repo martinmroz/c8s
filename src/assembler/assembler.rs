@@ -337,6 +337,32 @@ mod tests {
   }
 
   #[test]
+  fn test_define_constants() {
+    let program = vec![
+      make_directive_node   (1, "org", vec![Literal::Numeric(0x100)]),
+      make_label_node       (2, "CONST_1"),
+      make_directive_node   (3, "equ", vec![Literal::Numeric(0xFFF)]),
+      make_label_node       (4, "CONST_2"),
+      make_directive_node   (5, "equ", vec![Literal::Numeric(100)]),
+      make_label_node       (6, "address_1"),
+    ];
+
+    let result = define_labels(&program);
+
+    // Assert that semantic analysis passed.
+    if let Err(reason) = result {
+      panic!("Unexpected failure in assembler pass 1: {}", reason);
+    }
+
+    // Verify that the labels are defined as expected.
+    let label_map = result.unwrap();
+    assert_eq!(label_map.len(), 3);
+    assert_eq!(label_map.get("CONST_1").unwrap(), &(u12![0xFFF]));
+    assert_eq!(label_map.get("CONST_2").unwrap(), &(u12![100]));
+    assert_eq!(label_map.get("address_1").unwrap(), &(u12![0x100]));
+  }
+
+  #[test]
   fn test_define_labels_does_semantic_analysis_on_org() {
     let program = vec![
       make_directive_node(1, "org", vec![])
