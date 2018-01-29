@@ -595,12 +595,12 @@ mod tests {
     assert_eq!(se_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
 
     // Skip next if Vx == LABEL:nn with invalid label name.
-    let se_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("se", &vec![
+    let se_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("se", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
     ).unwrap_err();
-    assert_eq!(se_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
+    assert_eq!(se_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
@@ -666,12 +666,12 @@ mod tests {
     assert_eq!(sne_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
 
     // Skip next if Vx != LABEL:nn with invalid label name.
-    let sne_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("sne", &vec![
+    let sne_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("sne", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
     ).unwrap_err();
-    assert_eq!(sne_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
+    assert_eq!(sne_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
@@ -732,12 +732,12 @@ mod tests {
     assert_eq!(ld_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
 
     // Load the constant value LABEL:nn into Vx with invalid label name.
-    let ld_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("ld", &vec![
+    let ld_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("ld", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
     ).unwrap_err();
-    assert_eq!(ld_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
+    assert_eq!(ld_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
@@ -889,12 +889,12 @@ mod tests {
     assert_eq!(rnd_invalid_label_value_error, Error::ExpectingEightBitValue(0xFFF));
 
     // Load the constant value LABEL:nn into Vx with invalid label name.
-    let rnd_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("rnd", &vec![
+    let rnd_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("rnd", &vec![
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
     ).unwrap_err();
-    assert_eq!(rnd_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
+    assert_eq!(rnd_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
@@ -934,31 +934,31 @@ mod tests {
     assert_eq!(drw_label4.0, Opcode::DRW { register_x: 1, register_y: 2, bytes: 15 });
 
     // Draw sprite with invalid 8-bit parameter number of bytes.
-    let drw_invalid_12_bit_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+    let drw_invalid_label_value_12_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
       InstructionField::GeneralPurposeRegister(1),
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("TWELVE_BITS")],
       &label_map
     ).unwrap_err();
-    assert_eq!(drw_invalid_12_bit_value_error, Error::ExpectingFourBitValue(0xFFF));
+    assert_eq!(drw_invalid_label_value_12_error, Error::ExpectingFourBitValue(0xFFF));
 
     // Draw sprite with invalid 8-bit parameter number of bytes.
-    let drw_invalid_8_bit_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+    let drw_invalid_label_value_8_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
       InstructionField::GeneralPurposeRegister(1),
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("EIGHT_BITS")],
       &label_map
     ).unwrap_err();
-    assert_eq!(drw_invalid_8_bit_value_error, Error::ExpectingFourBitValue(0xFF));
+    assert_eq!(drw_invalid_label_value_8_error, Error::ExpectingFourBitValue(0xFF));
 
     // Draw sprite with invalid label name.
-    let drw_invalid_label_value_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
+    let drw_invalid_label_name_error = Instruction::from_mnemonic_and_parameters("drw", &vec![
       InstructionField::GeneralPurposeRegister(1),
       InstructionField::GeneralPurposeRegister(2),
       InstructionField::Identifier("INVALID")],
       &label_map
     ).unwrap_err();
-    assert_eq!(drw_invalid_label_value_error, Error::UnableToResolveLabel(String::from("INVALID")));
+    assert_eq!(drw_invalid_label_name_error, Error::UnableToResolveLabel(String::from("INVALID")));
   }
 
   #[test]
