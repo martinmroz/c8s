@@ -18,3 +18,5 @@ test:
   rnd   v0, 255
   drw   v0, v1, CONST_04B
   drw   v0, v1, 15
+  ld    v0, test
+  ld    v0, 0
