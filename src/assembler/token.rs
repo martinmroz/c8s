@@ -79,15 +79,15 @@ impl<'a> fmt::Display for Token<'a> {
  Un-parameterized display names for tokens.
  */
 pub mod display_names {
-  pub const SINGLE_LINE_COMMENT: &'static str = "single-line comment";
-  pub const DIRECTIVE_MARKER: &'static str    = "directive marker";
-  pub const IDENTIFIER: &'static str          = "identifier";
-  pub const LABEL_MARKER: &'static str        = "label marker";
-  pub const STRING_LITERAL: &'static str      = "string literal";
-  pub const NUMERIC_LITERAL: &'static str     = "numeric literal";
-  pub const COMMA: &'static str               = "comma";
-  pub const NEWLINE: &'static str             = "newline";
-  pub const INSTRUCTION_FIELD: &'static str   = "instruction field";
+  pub const SINGLE_LINE_COMMENT: &str = "single-line comment";
+  pub const DIRECTIVE_MARKER: &str    = "directive marker";
+  pub const IDENTIFIER: &str          = "identifier";
+  pub const LABEL_MARKER: &str        = "label marker";
+  pub const STRING_LITERAL: &str      = "string literal";
+  pub const NUMERIC_LITERAL: &str     = "numeric literal";
+  pub const COMMA: &str               = "comma";
+  pub const NEWLINE: &str             = "newline";
+  pub const INSTRUCTION_FIELD: &str   = "instruction field";
 }
 
 #[cfg(test)]
