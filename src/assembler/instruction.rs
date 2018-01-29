@@ -7,7 +7,7 @@
 // distributed except according to those terms.
 //
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::error;
 use std::fmt;
 
@@ -66,7 +66,7 @@ pub struct Instruction(Opcode);
  @param label_map The mapping of labels to their resolved addresses.
  @return The address from the label map if defined, or an error describing the failure.
  */
-fn resolve_label_with_map<'a>(label: &'a str, label_map: &BTreeMap<&'a str, U12>) -> Result<U12, Error> {
+fn resolve_label_with_map<'a>(label: &'a str, label_map: &HashMap<&'a str, U12>) -> Result<U12, Error> {
   label_map
     .get(label)
     .map(|value| *value)
@@ -109,7 +109,7 @@ impl<'a> Instruction {
    @param label_map A reference to a map of labels to their defined address values.
    @return The assembled instruction if successful or a string describing the failure otherwise.
    */
-  pub fn from_mnemonic_and_parameters(input_mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &BTreeMap<&'a str, U12>) -> Result<Self, Error> {
+  pub fn from_mnemonic_and_parameters(input_mnemonic: &'a str, fields: &Vec<InstructionField<'a>>, label_map: &HashMap<&'a str, U12>) -> Result<Self, Error> {
     let mut opcode: Option<Opcode> = None;
 
     // Mnemonics match case-insensitive.
@@ -345,7 +345,7 @@ impl<'a> Instruction {
 #[cfg(test)]
 mod tests {
 
-  use std::collections::BTreeMap;
+  use std::collections::HashMap;
 
   use twelve_bit::u12;
   use twelve_bit::u12::*;
@@ -371,7 +371,7 @@ mod tests {
 
   #[test]
   fn test_nop() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let nop = Instruction::from_mnemonic_and_parameters("nop", &vec![], &empty_map).unwrap();
     assert_eq!(nop.size(), 2);
     assert_eq!(nop.0, Opcode::NOP);
@@ -379,7 +379,7 @@ mod tests {
 
   #[test]
   fn test_cls() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let cls = Instruction::from_mnemonic_and_parameters("cls", &vec![], &empty_map).unwrap();
     assert_eq!(cls.size(), 2);
     assert_eq!(cls.0, Opcode::CLS);
@@ -387,7 +387,7 @@ mod tests {
 
   #[test]
   fn test_ret() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let ret = Instruction::from_mnemonic_and_parameters("ret", &vec![], &empty_map).unwrap();
     assert_eq!(ret.size(), 2);
     assert_eq!(ret.0, Opcode::RET);
@@ -395,7 +395,7 @@ mod tests {
 
   #[test]
   fn test_trapret() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let trapret = Instruction::from_mnemonic_and_parameters("trapret", &vec![], &empty_map).unwrap();
     assert_eq!(trapret.size(), 2);
     assert_eq!(trapret.0, Opcode::TRAPRET);
@@ -403,7 +403,7 @@ mod tests {
 
   #[test]
   fn test_trap() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let trap = Instruction::from_mnemonic_and_parameters("trap", &vec![], &empty_map).unwrap();
     assert_eq!(trap.size(), 2);
     assert_eq!(trap.0, Opcode::TRAP);
@@ -411,8 +411,8 @@ mod tests {
 
   #[test]
   fn test_jp() {
-    let empty_map = BTreeMap::new();
-    let mut defined_map = BTreeMap::new();
+    let empty_map = HashMap::new();
+    let mut defined_map = HashMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
 
     // Failure Mode 1: No Parameters.
@@ -440,8 +440,8 @@ mod tests {
 
   #[test]
   fn test_jp_v0() {
-    let empty_map = BTreeMap::new();
-    let mut defined_map = BTreeMap::new();
+    let empty_map = HashMap::new();
+    let mut defined_map = HashMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
 
     let v0_field = InstructionField::GeneralPurposeRegister(0);
@@ -471,8 +471,8 @@ mod tests {
 
   #[test]
   fn test_call() {
-    let empty_map = BTreeMap::new();
-    let mut defined_map = BTreeMap::new();
+    let empty_map = HashMap::new();
+    let mut defined_map = HashMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
 
     // Failure Mode 1: No Parameters.
@@ -500,7 +500,7 @@ mod tests {
 
   #[test]
   fn test_se_immediate_and_register_and_keypad() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
 
@@ -529,7 +529,7 @@ mod tests {
 
   #[test]
   fn test_sne_immediate_and_register_and_keypad() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
 
@@ -558,7 +558,7 @@ mod tests {
 
   #[test]
   fn test_ld_immediate_and_register_and_index() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
 
@@ -582,8 +582,8 @@ mod tests {
 
   #[test]
   fn test_ld_index() {
-    let empty_map = BTreeMap::new();
-    let mut defined_map = BTreeMap::new();
+    let empty_map = HashMap::new();
+    let mut defined_map = HashMap::new();
     defined_map.insert("TEST_LABEL", u12::MAX);
 
     // Failure Mode: Undefined Label.
@@ -607,7 +607,7 @@ mod tests {
 
   #[test]
   fn test_add_immediate_and_register_and_index() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
     let index_register_field = InstructionField::IndexRegister;
@@ -637,7 +637,7 @@ mod tests {
 
   #[test]
   fn test_and_or_xor_sub_subn_shr_shl() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
 
@@ -679,7 +679,7 @@ mod tests {
 
   #[test]
   fn test_rnd() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
 
     // Rnd vX, imm8.
@@ -697,7 +697,7 @@ mod tests {
 
   #[test]
   fn test_drw() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field_1 = InstructionField::GeneralPurposeRegister(1);
     let register_field_2 = InstructionField::GeneralPurposeRegister(2);
 
@@ -716,7 +716,7 @@ mod tests {
 
   #[test]
   fn test_ld_delay_and_sound_timer_and_keypad() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(15);
     let sound_timer_field = InstructionField::SoundTimer;
     let delay_timer_field = InstructionField::DelayTimer;
@@ -745,7 +745,7 @@ mod tests {
 
   #[test]
   fn test_sprite() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let sprite_field = InstructionField::Sprite;
 
@@ -757,7 +757,7 @@ mod tests {
 
   #[test]
   fn test_bcd() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let bcd_field = InstructionField::Bcd;
 
@@ -769,7 +769,7 @@ mod tests {
 
   #[test]
   fn test_save() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
 
@@ -781,7 +781,7 @@ mod tests {
 
   #[test]
   fn test_restore() {
-    let empty_map = BTreeMap::new();
+    let empty_map = HashMap::new();
     let register_field = InstructionField::GeneralPurposeRegister(7);
     let index_register_indirect_field = InstructionField::IndexRegisterIndirect;
 

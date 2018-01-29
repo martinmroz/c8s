@@ -7,7 +7,7 @@
 // distributed except according to those terms.
 //
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::error;
 use std::fmt;
 use std::mem;
@@ -112,8 +112,8 @@ impl<'a> fmt::Display for SemanticError<'a> {
  @return The map of labels to their corresponding addresses on success or a string describing
      the reason the first pass failed.
  */
-fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U12>, SemanticError<'a>> {
-  let mut label_address_map = BTreeMap::new();
+fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<HashMap<&'a str, U12>, SemanticError<'a>> {
+  let mut label_address_map = HashMap::new();
   let mut current_address = u12![0];
 
   // Label definition seeks forward to see if it is a constant definition.
@@ -195,7 +195,7 @@ fn define_labels<'a>(syntax_list: &Vec<Node<'a>>) -> Result<BTreeMap<&'a str, U1
 
 // MARK: - Pass 2: Emit Bytes
 
-fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &BTreeMap<&'a str, U12>) -> Result<Vec<DataRange>, SemanticError<'a>> {
+fn emit_data_ranges<'a>(syntax_list: Vec<Node<'a>>, label_address_map: &HashMap<&'a str, U12>) -> Result<Vec<DataRange>, SemanticError<'a>> {
   let mut data_ranges = Vec::new();
   let mut current_range = DataRange::new(u12![0]);
 
