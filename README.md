@@ -30,14 +30,17 @@ The following literal types are supported.
 	* Valid in the context of a mnemonic or within directives.
 	* Decimal `0...15`
 	* Hexadecimal `$0-$F` and `#0-#F` (case-insensitive).
+	* A label in the range `$0-$F` whether constant or address-based.
 * 8-bit numeric.
 	* Valid in the context of a mnemonic or within directives.
 	* Decimal `0...255`
 	* Hexadecimal `$0-$FF` and `#0-#FF` (case-insensitive).
+	* A label in the range `$00-$FF` whether constant or address-based.
 * 12-bit numeric.
 	* Valid in the context of a mnemonic only, not within directives.
 	* Decimal `0...4095`
 	* Hexadecimal `$0-$FFF` and `#0-#FFF` (case-insensitive).
+	* A label in the range `$000-$FFF` whether constant or address-based.
 * String.
 	* Valid only in the context of `.DB` directive.
 	* NOT null-terminated.
@@ -52,15 +55,18 @@ The following literal types are supported.
 * `.ORG addr`
 	* Sets the new output origin to `addr`. 
 	* Origin directives do not have to be increasing. The origin may be set to something below the current address counter. No two pieces of data may be written to the same address, and this will trigger an error. NOTE: The `c8s` assembler begins at origin `$000` and you must utilize the Origin directive to change that.
+* `.EQU <value>`
+	* Sets the value of the immediately-preceding label to `value`.
 
 ## Labels
 
-Any identifier followed by a colon (`NAME:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly. As a two-pass assembler, labels do not need to be defined in advance of being used.
+Any identifier followed by a colon (`NAME:`) is considered a label. Labels are case-sensitive when referenced from elsewhere in the assembly. As a two-pass assembler, labels do not need to be defined in advance of being used. Labels may be defined as constants
+through through the `.EQU` directive.
 
 ## Mnemonics
 
 ### Standard Set
-`c8s` supports effectively all standard Chip-8/48 mnemonics (not Super Chip-48). The mnemonic set supported is compatbile with the [Cowgod Chip-8 Technical Reference v1.0](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM). The mnemonics and registers are case-insensitive.
+`c8s` supports effectively all standard Chip-8/48 mnemonics (not Super Chip-48). The mnemonic set supported is compatbile with the [Cowgod Chip-8 Technical Reference v1.0](http://devernay.free.fr/hacks/chip8/C8TECH10.HTM). The mnemonics and registers are case-insensitive. Any literal value can be specified in place or via label.
 
 | Opcode | Mnemonic        | Function                                                    |
 | ------ | --------------- | ----------------------------------------------------------- |

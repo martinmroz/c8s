@@ -124,7 +124,6 @@ mod tests {
   use super::*;
 
   use twelve_bit::u12;
-  use twelve_bit::u12::*;
 
   #[test]
   fn test_empty_ranges() {
