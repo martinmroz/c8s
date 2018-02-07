@@ -28,16 +28,19 @@ The following literal types are supported.
 
 * 4-bit numeric.
 	* Valid in the context of a mnemonic or within directives.
+	* Binary `%0000...%1111`
 	* Decimal `0...15`
 	* Hexadecimal `$0-$F` and `#0-#F` (case-insensitive).
 	* A label in the range `$0-$F` whether constant or address-based.
 * 8-bit numeric.
 	* Valid in the context of a mnemonic or within directives.
+	* Binary `%00000000...%11111111`
 	* Decimal `0...255`
 	* Hexadecimal `$0-$FF` and `#0-#FF` (case-insensitive).
 	* A label in the range `$00-$FF` whether constant or address-based.
 * 12-bit numeric.
 	* Valid in the context of a mnemonic only, not within directives.
+	* Binary `%000000000000...%111111111111`
 	* Decimal `0...4095`
 	* Hexadecimal `$0-$FFF` and `#0-#FFF` (case-insensitive).
 	* A label in the range `$000-$FFF` whether constant or address-based.

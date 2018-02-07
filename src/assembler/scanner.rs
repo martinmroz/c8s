@@ -25,6 +25,10 @@ pub enum Error<'a> {
   DecimalLiteralOutOfRange(&'a str),
   /// An invalid decimal literal was encountered at `location`.
   InvalidDecimalLiteral,
+  /// An invalid binary literal starting with `%` was encountered at `location`.
+  InvalidBinaryLiteral,
+  /// An valid binary literal was encountered at `location` with `value` not in `0...4095`.
+  BinaryLiteralOutOfRange(&'a str),
   /// An invalid identifier was encountered at `location`.
   InvalidIdentifier,
   /// An expected Register Indirect `[i]` was not matched.
@@ -43,6 +47,8 @@ impl<'a> error::Error for Error<'a> {
       &Error::InvalidHexadecimalLiteral   => "Invalid hexadecimal literal starting with ($)",
       &Error::DecimalLiteralOutOfRange(_) => "Decimal literal not in range 0...4095",
       &Error::InvalidDecimalLiteral       => "Invalid decimal literal encountered",
+      &Error::InvalidBinaryLiteral        => "Invalid binary literal encountered",
+      &Error::BinaryLiteralOutOfRange(_)  => "Binary literal not in range 0...4095",
       &Error::InvalidIdentifier           => "Invalid identifier encountered",
       &Error::ExpectedRegisterIndirect    => "Expected Index Register Indirect ([i]) not found",
       &Error::InvalidCharacter(_)         => "Invalid character encountered",
@@ -76,6 +82,42 @@ pub struct Scanner<'a> {
   current_line: usize,
   /// Tracks the offset within the current line, in code points, starting at 1.
   current_line_offset: usize
+}
+
+/// Parses an input binary string consisting of '.' or '0' for 0, and '1' for 1.
+/// Returns either `Ok(usize)` if in the range `0...4095` or an `Error` code.
+fn parse_12_bit_bin_str<'a>(bin_str: &'a str) -> Result<usize, Error<'a>> {
+  let mut value_result_iterator = bin_str
+    .chars()
+    .map(|c| match c {
+      '.' => Ok(0),
+      '0' => Ok(0),
+      '1' => Ok(1),
+        _ => Err(Error::InvalidBinaryLiteral),
+    });
+
+  let mut accumulator = 0usize;
+
+  // Each new bit encountered shifts the accumulator left by 1 and is the new lsb.
+  while let Some(result) = value_result_iterator.next() {
+    if result.is_err() {
+      return result;
+    } else {
+      accumulator = match accumulator.checked_shl(1) {
+        Some(shifted) =>
+          shifted | result.unwrap(),
+        None =>
+          return Err(Error::BinaryLiteralOutOfRange(bin_str)),
+      };
+    }
+  }
+
+  // Make sure the binary value fits cleanly in 12 bits.
+  if accumulator <= 0xFFF {
+    Ok(accumulator)
+  } else {
+    Err(Error::BinaryLiteralOutOfRange(bin_str))
+  }
 }
 
 impl<'a> Scanner<'a> {
@@ -150,6 +192,43 @@ impl<'a> Scanner<'a> {
         let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
         self.position = self.input.len();
         Token::Error(Error::InvalidHexadecimalLiteral, location)
+      }
+    }
+  }
+
+  /**
+   Matches a 1 to 12-bit binary literal beginning with %.
+   Zeroes are represented with '.' or '0' and Ones are represented with '1'.
+   @return A token containing the literal value as a usize, or Error in case of invalid formatting.
+   */
+  fn consume_bin_literal(&mut self) -> Token<'a> {
+    lazy_static! {
+       static ref HEX_LITERAL: Regex = Regex::new(r#"^%[01\.]+"#).unwrap();
+    }
+    match HEX_LITERAL.find(&self.input[self.position .. ]) {
+      Some((0, byte_index_end)) => {
+        // Strip off the leading '%' and parse the hexadecimal value.
+        let slice_start = self.position + '$'.len_utf8();
+        let slice_end = self.position + byte_index_end;
+        let slice = &self.input[slice_start .. slice_end];
+        let location = self.advance_by(byte_index_end);
+        
+        // Match on a decimal literal in the range 0...4095.
+        match parse_12_bit_bin_str(slice) {
+          Ok(value) =>
+            Token::NumericLiteral(value, location),
+          Err(e) => {
+            // Push to the end of the input to indicate parse failure.
+            self.position = self.input.len();
+            Token::Error(e, location)
+          }
+        }
+      }
+      _ => {
+        // Advance to the end of the input to terminate the parse and indicate failure.
+        let location = SourceFileLocation::new(self.file_name, self.current_line, self.current_line_offset, 1);
+        self.position = self.input.len();
+        Token::Error(Error::InvalidBinaryLiteral, location)
       }
     }
   }
@@ -367,6 +446,7 @@ impl<'a> Scanner<'a> {
       '"' => { Some(self.consume_string_literal()) }
       '$' => { Some(self.consume_hex_literal()) }
       '#' => { Some(self.consume_hex_literal()) }
+      '%' => { Some(self.consume_bin_literal()) }
       '[' => { Some(self.consume_index_register_indirect()) }
       
       '0' ... '9' => {
@@ -419,6 +499,17 @@ mod tests {
   use assembler::source_file_location::SourceFileLocation;
 
   use super::*;
+
+  #[test]
+  fn test_parse_12_bit_bin_str() {
+    assert_eq!(parse_12_bit_bin_str(""), Ok(0));
+    assert_eq!(parse_12_bit_bin_str("...000."), Ok(0));
+    assert_eq!(parse_12_bit_bin_str("...0001"), Ok(1));
+    assert_eq!(parse_12_bit_bin_str(".....111111111111"), Ok(4095));
+    assert_eq!(parse_12_bit_bin_str("....1000000000000"), Err(Error::BinaryLiteralOutOfRange("....1000000000000")));
+    assert_eq!(parse_12_bit_bin_str("...11111111111111"), Err(Error::BinaryLiteralOutOfRange("...11111111111111")));
+    assert_eq!(parse_12_bit_bin_str("...1111111111111+"), Err(Error::InvalidBinaryLiteral));
+  }
 
   #[test]
   fn test_is_at_end_empty_string() {
@@ -586,6 +677,23 @@ mod tests {
     assert_eq!(scanner.next(), Some(Token::NumericLiteral(1, SourceFileLocation::new("-", 1, 24, 1))));
     assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 25, 2))));
     assert_eq!(scanner.next(), Some(Token::Error(Error::DecimalLiteralOutOfRange("4096"), SourceFileLocation::new("-", 1, 28, 4))));
+    assert_eq!(scanner.next(), None);
+    assert_eq!(scanner.is_at_end(), true);
+  }
+
+  #[test]
+  fn test_numeric_literal_bin() {
+    let mut scanner = Scanner::new("-", "%0 %.. %0.. %1 %1111 %11111111 %111111111 %1_0 %");
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x0, SourceFileLocation::new("-", 1, 1, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x00, SourceFileLocation::new("-", 1, 4, 3))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x000, SourceFileLocation::new("-", 1, 8, 4))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 13, 2))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xF, SourceFileLocation::new("-", 1, 16, 5))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0xFF, SourceFileLocation::new("-", 1, 22, 9))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1FF, SourceFileLocation::new("-", 1, 32, 10))));
+    assert_eq!(scanner.next(), Some(Token::NumericLiteral(0x1, SourceFileLocation::new("-", 1, 43, 2))));
+    assert_eq!(scanner.next(), Some(Token::Identifier("_0", SourceFileLocation::new("-", 1, 45, 2))));
+    assert_eq!(scanner.next(), Some(Token::Error(Error::InvalidBinaryLiteral, SourceFileLocation::new("-", 1, 48, 1))));
     assert_eq!(scanner.next(), None);
     assert_eq!(scanner.is_at_end(), true);
   }
