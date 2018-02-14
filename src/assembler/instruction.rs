@@ -175,6 +175,10 @@ impl<'a> Instruction {
     // Mnemonics with two parameters.
     if fields.len() == 2 {
       opcode = match (mnemonic, fields.get(0).unwrap(), fields.get(1).unwrap()) {
+        ("ld", &InstructionField::IndexRegister, &InstructionField::IndexRegisterIndirect) => {
+          Some(Opcode::DEREF_I)
+        }
+
         ("se", &InstructionField::GeneralPurposeRegister(x), &InstructionField::NumericLiteral(value)) => {
           Some(Opcode::SE_IMMEDIATE { register_x: x, value: try!(numeric_literal_to_8_bit_field(value)) })
         }
@@ -423,6 +427,18 @@ mod tests {
     let cls = Instruction::from_mnemonic_and_parameters("cls", &vec![], &empty_map).unwrap();
     assert_eq!(cls.size(), 2);
     assert_eq!(cls.0, Opcode::CLS);
+  }
+
+  #[test]
+  fn test_deref_i() {
+    let empty_map = HashMap::new();
+    let ret = Instruction::from_mnemonic_and_parameters("ld", &vec![
+      InstructionField::IndexRegister,
+      InstructionField::IndexRegisterIndirect], 
+      &empty_map
+    ).unwrap();
+    assert_eq!(ret.size(), 2);
+    assert_eq!(ret.0, Opcode::DEREF_I);
   }
 
   #[test]

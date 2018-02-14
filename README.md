@@ -73,7 +73,6 @@ through through the `.EQU` directive.
 
 | Opcode | Mnemonic        | Function                                                    |
 | ------ | --------------- | ----------------------------------------------------------- |
-| 0nnn   | `SYS addr`      | Jump to a machine code routine at `nnn`. *Unsupported*.     |
 | 00E0   | `CLS`           | Clear the display.                                          |
 | 00EE   | `RET`           | Return from subroutine.                                     |
 | 1nnn   | `JP addr`       | Jump to the address `nnn`.                                  |
@@ -115,6 +114,7 @@ The `c8s` assembler was written in support of the `FPC8` FPGA Chip-8 implementat
 
 | Opcode | Mnemonic        | Function                                                    |
 | ------ | --------------- | ----------------------------------------------------------- |
+| 00F8   | `LD I, [I]`     | Loads register `I` from the address stored in register `I`. |
 | 00F9   | `TRAPRET`       | Return from a software trap.                                |
 | 00FA   | `TRAP`          | Triggers a non-specific software trap.                      |
 

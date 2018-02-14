@@ -17,6 +17,7 @@ pub enum Opcode {
   NOP             ,
   CLS             ,
   RET             ,
+  DEREF_I         ,
   TRAP            ,
   TRAPRET         ,
   JP              { target: U12 },
@@ -72,6 +73,7 @@ impl Opcode {
     match nibbles {
       (0x0, 0x0, 0xE, 0x0) => { Opcode::CLS           }
       (0x0, 0x0, 0xE, 0xE) => { Opcode::RET           }
+      (0x0, 0x0, 0xF, 0x8) => { Opcode::DEREF_I       }
       (0x0, 0x0, 0xF, 0x9) => { Opcode::TRAPRET       }
       (0x0, 0x0, 0xF, 0xA) => { Opcode::TRAP          }
       (0x1, _,   _,   _  ) => { Opcode::JP            { target: imm12 } }
@@ -115,6 +117,7 @@ impl Opcode {
       Opcode::NOP                                                     => { format!("nop") }
       Opcode::CLS                                                     => { format!("cls") }
       Opcode::RET                                                     => { format!("ret") }
+      Opcode::DEREF_I                                                 => { format!("ld i, [i]") }
       Opcode::TRAP                                                    => { format!("trap") }
       Opcode::TRAPRET                                                 => { format!("trapret") }
       Opcode::JP              { target }                              => { format!("jp ${:3x}", u16::from(target)) }
@@ -157,6 +160,7 @@ impl Opcode {
       Opcode::NOP                                                     => { 0x0000 }
       Opcode::CLS                                                     => { 0x00E0 }
       Opcode::RET                                                     => { 0x00EE }
+      Opcode::DEREF_I                                                 => { 0x00F8 }
       Opcode::TRAPRET                                                 => { 0x00F9 }
       Opcode::TRAP                                                    => { 0x00FA }
       Opcode::JP              { target }                              => { format_instruction_imm12(0x1, target) }
@@ -276,10 +280,11 @@ mod tests {
 
   #[test]
   fn test_to_assembly_string() {
-    let test_cases: [(u16, &'static str); 37] = [ 
+    let test_cases = [ 
       /* NOP          */ (0x0000, "nop"),
       /* CLS          */ (0x00E0, "cls"),
       /* RET          */ (0x00EE, "ret"),
+      /* DEREF_I      */ (0x00F8, "ld i, [i]"),
       /* TRAPRET      */ (0x00F9, "trapret"),
       /* TRAP         */ (0x00FA, "trap"),
       /* JP $456      */ (0x1456, "jp $456"),
